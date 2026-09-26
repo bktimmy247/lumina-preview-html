@@ -94,6 +94,8 @@
     const goldMat=new THREE.MeshStandardMaterial({color:0xd1a65d,roughness:.2,metalness:.92});
     const insetWhite=new THREE.MeshStandardMaterial({color:0xfff7e6,roughness:.2,metalness:.15,emissive:0x2c2416,emissiveIntensity:.15});
     const insetBlack=new THREE.MeshStandardMaterial({color:0x28384f,roughness:.18,metalness:.62,emissive:0x071424,emissiveIntensity:.35});
+    const crystalWhite=new THREE.MeshPhysicalMaterial({color:0x9fe7ff,roughness:.08,metalness:.05,transmission:.2,transparent:true,opacity:.96,emissive:0x174b66,emissiveIntensity:.65});
+    const crystalBlack=new THREE.MeshPhysicalMaterial({color:0xff6b78,roughness:.08,metalness:.08,transmission:.12,transparent:true,opacity:.95,emissive:0x4a0c13,emissiveIntensity:.72});
     const geo={
       cyl:(a,b,h,n=40)=>new THREE.CylinderGeometry(a,b,h,n), sphere:(r,ws=36,hs=24)=>new THREE.SphereGeometry(r,ws,hs), cone:(r,h,n=40)=>new THREE.ConeGeometry(r,h,n), box:(x,y,z)=>new THREE.BoxGeometry(x,y,z), torus:(r,t)=>new THREE.TorusGeometry(r,t,16,48),
       lathe:(pts)=>new THREE.LatheGeometry(pts.map(([x,y])=>new THREE.Vector2(x,y)),48)
@@ -108,40 +110,82 @@
     function jewel(mat,y=.98,scale=1){
       const j=part(new THREE.OctahedronGeometry(.095*scale,1),mat,y);j.rotation.y=Math.PI/4;return j
     }
+    function armorPlate(mat,w=.26,h=.34,d=.08,y=.82,z=0,tilt=0){
+      const m=part(geo.box(w,h,d),mat,y,0,tilt);m.position.z=z;return m
+    }
+    function spear(mat,y=.9){
+      const g=new THREE.Group(), shaft=part(geo.cyl(.022,.022,.76,16),goldMat,y);shaft.rotation.z=.08;g.add(shaft);
+      const tip=part(geo.cone(.07,.22,18),mat,y+.47);tip.rotation.z=.08;g.add(tip);return g
+    }
     function makePiece(type,color,square){
-      const mat=color==='w'?whiteMat:blackMat, inset=color==='w'?insetWhite:insetBlack, g=new THREE.Group(); g.userData={kind:'piece',square,color,type}; g.add(baseBody(mat));
+      const mat=color==='w'?whiteMat:blackMat, inset=color==='w'?insetWhite:insetBlack, crystal=color==='w'?crystalWhite:crystalBlack;
+      const g=new THREE.Group(); g.userData={kind:'piece',square,color,type}; g.add(baseBody(mat));
+
       if(type==='p'){
-        g.add(part(geo.lathe([[.22,0],[.25,.12],[.18,.28],[.14,.42],[.18,.50]]),mat,.31));
-        g.add(part(geo.sphere(.19),inset,.93)); g.add(part(geo.torus(.18,.025),goldMat,.83,Math.PI/2));
+        // Royal guard: cuirass, helmet, tiny spear.
+        g.add(part(geo.lathe([[.22,0],[.27,.11],[.23,.28],[.18,.48],[.21,.56]]),mat,.31));
+        const chest=armorPlate(goldMat,.28,.28,.07,.84,.18,.08);g.add(chest);
+        const head=part(geo.sphere(.18),inset,.96);head.scale.set(1,.92,.95);g.add(head);
+        const helm=part(geo.cone(.19,.28,28),mat,1.18);helm.scale.y=.9;g.add(helm);
+        const plume=part(geo.cone(.055,.27,14),crystal,1.40);plume.rotation.z=.18;g.add(plume);
       }
+
       if(type==='r'){
-        g.add(part(geo.lathe([[.25,0],[.28,.12],[.24,.52],[.31,.60]]),mat,.31));
-        g.add(part(geo.cyl(.34,.34,.17),mat,.95)); g.add(part(geo.torus(.29,.035),goldMat,1.02,Math.PI/2));
-        for(let i=0;i<6;i++){const a=i*Math.PI/3,c=part(geo.box(.12,.2,.18),mat,1.12);c.position.x=Math.cos(a)*.24;c.position.z=Math.sin(a)*.24;c.rotation.y=-a;g.add(c)}
+        // Fortress golem / rook.
+        g.add(part(geo.lathe([[.27,0],[.32,.12],[.29,.50],[.34,.61]]),mat,.31));
+        const keep=part(geo.cyl(.36,.38,.22,8),mat,.99);keep.rotation.y=Math.PI/8;g.add(keep);
+        for(let i=0;i<8;i++){if(i%2===0){const a=i*Math.PI/4,c=part(geo.box(.13,.24,.18),goldMat,1.20);c.position.x=Math.cos(a)*.28;c.position.z=Math.sin(a)*.28;c.rotation.y=-a;g.add(c)}}
+        const core=jewel(crystal,1.04,1.25);g.add(core);
+        for(const side of [-1,1]){const butt=part(geo.box(.12,.38,.18),mat,.66);butt.position.x=.27*side;g.add(butt)}
       }
+
       if(type==='n'){
-        g.add(part(geo.lathe([[.24,0],[.28,.12],[.21,.34],[.18,.46]]),mat,.31));
-        const neck=part(geo.box(.30,.62,.34),mat,.82,0,-.22);neck.position.x=.08;neck.rotation.y=-.08;g.add(neck);
-        const head=part(geo.sphere(.27),inset,1.15);head.scale.set(1.22,.82,.82);head.position.x=.17;g.add(head);
-        const snout=part(geo.box(.30,.16,.22),mat,1.12,0,-.03);snout.position.x=.40;g.add(snout);
-        const ear1=part(geo.cone(.08,.22),goldMat,1.38);ear1.position.set(.10,1.38,.09);const ear2=ear1.clone();ear2.position.z=-.09;g.add(ear1,ear2);
+        // Armored warhorse.
+        g.add(part(geo.lathe([[.24,0],[.29,.12],[.23,.33],[.19,.47]]),mat,.31));
+        const chest=armorPlate(goldMat,.32,.30,.09,.73,.12,.08);g.add(chest);
+        const neck=part(geo.box(.30,.66,.35),mat,.84,0,-.24);neck.position.x=.08;neck.rotation.y=-.06;g.add(neck);
+        const head=part(geo.sphere(.28),inset,1.18);head.scale.set(1.28,.78,.86);head.position.x=.18;g.add(head);
+        const muzzle=part(geo.box(.31,.17,.23),mat,1.15,0,-.03);muzzle.position.x=.41;g.add(muzzle);
+        const visor=part(geo.box(.24,.07,.32),goldMat,1.28);visor.position.x=.18;visor.rotation.z=-.04;g.add(visor);
+        const horn=part(geo.cone(.07,.34,16),crystal,1.44);horn.rotation.z=-.18;horn.position.x=.02;g.add(horn);
+        for(const z of [-.1,.1]){const ear=part(geo.cone(.075,.22),mat,1.39);ear.position.z=z;ear.position.x=.06;g.add(ear)}
       }
+
       if(type==='b'){
-        g.add(part(geo.lathe([[.23,0],[.28,.13],[.2,.42],[.17,.59],[.22,.67]]),mat,.31));
-        const head=part(geo.sphere(.26),inset,1.04);head.scale.y=1.18;g.add(head);const tip=part(geo.cone(.12,.32),goldMat,1.39);tip.rotation.z=.18;g.add(tip);
+        // Battle priest / bishop.
+        g.add(part(geo.lathe([[.23,0],[.29,.12],[.23,.37],[.18,.62],[.24,.72]]),mat,.31));
+        const mantle=part(geo.cone(.32,.42,36),mat,.93);mantle.rotation.x=Math.PI;g.add(mantle);
+        const face=part(geo.sphere(.20),inset,1.11);face.scale.y=1.08;g.add(face);
+        const mitre=part(geo.cone(.22,.50,28),mat,1.43);mitre.scale.z=.72;g.add(mitre);
+        const sigil=jewel(crystal,1.43,.8);sigil.position.z=.16;g.add(sigil);
+        const staff=spear(crystal,.91);staff.position.x=.28;staff.scale.setScalar(.78);g.add(staff);
       }
+
       if(type==='q'){
-        g.add(part(geo.lathe([[.24,0],[.30,.13],[.22,.42],[.18,.65],[.25,.72]]),mat,.31));
-        g.add(part(geo.torus(.27,.045),goldMat,1.12,Math.PI/2));
-        for(let i=0;i<7;i++){const a=i*Math.PI*2/7,c=jewel(goldMat,1.31,.8);c.position.x=Math.cos(a)*.25;c.position.z=Math.sin(a)*.25;g.add(c)}
-        g.add(jewel(inset,1.36,1.1));
+        // Arcane queen with seven-point crown.
+        g.add(part(geo.lathe([[.24,0],[.31,.13],[.25,.44],[.19,.70],[.27,.79]]),mat,.31));
+        const torso=part(geo.cone(.30,.48,40),mat,.94);torso.rotation.x=Math.PI;g.add(torso);
+        g.add(part(geo.torus(.29,.045),goldMat,1.19,Math.PI/2));
+        for(let i=0;i<7;i++){const a=i*Math.PI*2/7,c=part(geo.cone(.06,.28,14),goldMat,1.37);c.position.x=Math.cos(a)*.25;c.position.z=Math.sin(a)*.25;c.rotation.z=Math.cos(a)*.12;g.add(c)}
+        const gem=jewel(crystal,1.48,1.5);g.add(gem);
+        for(const side of [-1,1]){const wing=armorPlate(goldMat,.10,.42,.05,1.03,.04,side*.22);wing.position.x=.28*side;g.add(wing)}
       }
+
       if(type==='k'){
-        g.add(part(geo.lathe([[.24,0],[.30,.13],[.22,.45],[.18,.7],[.24,.77]]),mat,.31));
-        g.add(part(geo.torus(.25,.04),goldMat,1.15,Math.PI/2)); g.add(jewel(inset,1.25,1.15));
-        const v=part(geo.box(.10,.38,.10),goldMat,1.47); const h=part(geo.box(.34,.09,.10),goldMat,1.52);g.add(v,h);
+        // High king: crown, mantle, sword/sceptre.
+        g.add(part(geo.lathe([[.25,0],[.32,.13],[.25,.45],[.20,.73],[.28,.82]]),mat,.31));
+        const mantle=part(geo.cone(.36,.48,40),mat,.96);mantle.rotation.x=Math.PI;g.add(mantle);
+        const face=part(geo.sphere(.21),inset,1.18);face.scale.y=1.03;g.add(face);
+        g.add(part(geo.torus(.28,.045),goldMat,1.31,Math.PI/2));
+        for(let i=0;i<5;i++){const a=i*Math.PI*2/5,c=part(geo.cone(.065,.31,14),goldMat,1.49);c.position.x=Math.cos(a)*.235;c.position.z=Math.sin(a)*.235;g.add(c)}
+        const gem=jewel(crystal,1.59,1.45);g.add(gem);
+        const staff=spear(crystal,1.03);staff.position.x=.33;staff.scale.setScalar(.92);g.add(staff);
+        const crossV=part(geo.box(.085,.34,.08),goldMat,1.77);const crossH=part(geo.box(.30,.075,.08),goldMat,1.80);g.add(crossV,crossH);
       }
-      const p=sqToPos(square);g.position.set(p.x,.08,p.z);g.scale.setScalar(.94);g.traverse(o=>{if(o.isMesh){o.userData=g.userData;pickables.push(o)}});return g;
+
+      const p=sqToPos(square);g.position.set(p.x,.08,p.z);g.scale.setScalar(type==='k'||type==='q'?.88:.91);
+      if(color==='b')g.rotation.y=Math.PI;
+      g.traverse(o=>{if(o.isMesh){o.userData=g.userData;pickables.push(o)}});return g;
     }
 
     const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false; let animating=false; let soundOn=true; let hoveredPiece=null;
