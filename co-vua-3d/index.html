@@ -12,7 +12,7 @@
     .glass{background:linear-gradient(145deg,rgba(22,29,43,.78),rgba(5,9,16,.64));border:1px solid var(--line);backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);box-shadow:0 18px 55px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.05)}
     .topbar{position:fixed;z-index:5;top:max(14px,env(safe-area-inset-top));left:14px;right:14px;height:58px;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;justify-content:space-between;pointer-events:auto}
     .brand{display:flex;align-items:center;gap:10px}.brand-mark{font-size:28px;color:var(--accent);filter:drop-shadow(0 0 12px rgba(229,189,114,.35))}.brand strong{display:block;font-size:14px;letter-spacing:.18em}.brand small{font-size:9px;color:var(--muted);letter-spacing:.12em}.actions{display:flex;gap:8px}
-    button{font:inherit;color:inherit}.icon-btn,.control-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);cursor:pointer}.icon-btn{width:40px;height:40px;border-radius:13px;font-size:18px;transition:.2s;background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.04))}.icon-btn:active,.control-btn:active{transform:scale(.97)}
+    button{font:inherit;color:inherit}.icon-btn,.control-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);cursor:pointer}.icon-btn{width:40px;height:40px;border-radius:13px;font-size:18px;transition:.2s;background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.04))}.icon-btn:hover,.control-btn:hover{border-color:rgba(229,189,114,.36);box-shadow:0 0 0 1px rgba(229,189,114,.08) inset}.icon-btn:active,.control-btn:active{transform:scale(.97)}
     .status{position:fixed;z-index:5;left:14px;bottom:calc(84px + env(safe-area-inset-bottom));min-width:min(360px,calc(100vw - 28px));border-radius:18px;padding:12px 14px;display:flex;gap:11px;align-items:center;pointer-events:none}
     .dot{width:13px;height:13px;border-radius:999px;background:#f3efe6;box-shadow:0 0 0 3px rgba(255,255,255,.08)}.dot.black{background:#202733}.copy span{display:block;font-size:9px;color:var(--muted);letter-spacing:.16em}.copy strong{display:block;margin-top:1px;font-size:15px}.copy small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
     .controls{position:fixed;z-index:5;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));border-radius:17px;padding:7px;display:flex;gap:7px;pointer-events:auto}.control-btn{height:42px;border-radius:12px;padding:0 14px;transition:.2s;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.035))}.control-btn span{margin-right:5px;color:var(--accent)}
@@ -34,7 +34,7 @@
   <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>THE OBSIDIAN TABLE</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
-    <div class="actions"><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
+    <div class="actions"><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
   </header>
   <div class="badge glass">Kéo xoay · Chụm zoom · Chạm để đi</div>
   <section class="status glass">
@@ -64,6 +64,7 @@
     const boardGroup=new THREE.Group(); world.add(boardGroup);
     const pieceGroup=new THREE.Group(); world.add(pieceGroup);
     const markerGroup=new THREE.Group(); world.add(markerGroup);
+    const fxGroup=new THREE.Group(); world.add(fxGroup);
     const pickables=[]; const squareMeshes=[];
     const obsidianMat=new THREE.MeshPhysicalMaterial({color:0x10151e,roughness:.2,metalness:.72,clearcoat:1,clearcoatRoughness:.18});
     const brassMat=new THREE.MeshStandardMaterial({color:0xb88945,roughness:.25,metalness:.9});
@@ -82,6 +83,11 @@
     const floor=new THREE.Mesh(new THREE.CircleGeometry(22,96),new THREE.MeshStandardMaterial({color:0x070a10,roughness:.74,metalness:.22})); floor.rotation.x=-Math.PI/2;floor.position.y=-.73;floor.receiveShadow=true;scene.add(floor);
     const ring=new THREE.Mesh(new THREE.RingGeometry(6.7,15.5,128),new THREE.MeshBasicMaterial({color:0x27445f,transparent:true,opacity:.12,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=-.715;scene.add(ring);
     const halo=new THREE.Mesh(new THREE.RingGeometry(5.4,5.47,128),new THREE.MeshBasicMaterial({color:0xd6a85d,transparent:true,opacity:.28,side:THREE.DoubleSide}));halo.rotation.x=-Math.PI/2;halo.position.y=-.70;scene.add(halo);
+    const backdrop=new THREE.Group(); scene.add(backdrop);
+    const pillarMat=new THREE.MeshStandardMaterial({color:0x111a29,roughness:.42,metalness:.62});
+    for(let i=0;i<8;i++){const a=i*Math.PI/4,p=new THREE.Mesh(new THREE.CylinderGeometry(.32,.46,6.5,10),pillarMat);p.position.set(Math.cos(a)*12,2.5,Math.sin(a)*12);p.rotation.y=a;p.receiveShadow=true;backdrop.add(p)}
+    const archMat=new THREE.MeshBasicMaterial({color:0x274e70,transparent:true,opacity:.08,side:THREE.DoubleSide});
+    for(let i=0;i<3;i++){const a=new THREE.Mesh(new THREE.TorusGeometry(10+i*1.4,.045,8,96,Math.PI),archMat);a.rotation.z=Math.PI/2;a.position.y=3+i*.5;scene.add(a)}
 
     const whiteMat=new THREE.MeshPhysicalMaterial({color:0xf1eadb,roughness:.22,metalness:.32,clearcoat:1,clearcoatRoughness:.16});
     const blackMat=new THREE.MeshPhysicalMaterial({color:0x151b26,roughness:.18,metalness:.62,clearcoat:1,clearcoatRoughness:.12});
@@ -138,41 +144,65 @@
       const p=sqToPos(square);g.position.set(p.x,.08,p.z);g.scale.setScalar(.94);g.traverse(o=>{if(o.isMesh){o.userData=g.userData;pickables.push(o)}});return g;
     }
 
-    const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false; let animating=false;
+    const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false; let animating=false; let soundOn=true; let hoveredPiece=null;
+    let audioCtx=null;
+    function tone(freq=440,dur=.08,type='sine',gain=.035,delay=0){
+      if(!soundOn)return; audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+      const t=audioCtx.currentTime+delay,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(gain,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+dur+.02)
+    }
+    function sfxSelect(){tone(720,.055,'sine',.025)}
+    function sfxMove(){tone(240,.07,'triangle',.035);tone(360,.09,'sine',.02,.04)}
+    function sfxCapture(){tone(135,.12,'sawtooth',.035);tone(90,.16,'triangle',.03,.03)}
+    function sfxCheck(){tone(520,.08,'square',.024);tone(760,.12,'sine',.024,.07)}
     const statusText=document.getElementById('statusText'), hintText=document.getElementById('hintText'), turnDot=document.getElementById('turnDot'), markerRoot=markerGroup, promotion=document.getElementById('promotion'), toast=document.getElementById('toast');
     function clearPieces(){for(let i=pieceGroup.children.length-1;i>=0;i--)pieceGroup.remove(pieceGroup.children[i]);for(let i=pickables.length-1;i>=0;i--){if(pickables[i].userData?.kind==='piece')pickables.splice(i,1)}}
     function renderPieces(){clearPieces();const b=chess.board();for(let r=0;r<8;r++)for(let f=0;f<8;f++){const pc=b[r][f];if(!pc)continue;const sq=String.fromCharCode(97+f)+(8-r);pieceGroup.add(makePiece(pc.type,pc.color,sq))}}
     function clearMarkers(){markerRoot.clear()}
     function markSquare(square,kind){const mat=kind==='sel'?selMat:kind==='cap'?capMat:moveMat;const disc=new THREE.Mesh(new THREE.CylinderGeometry(kind==='sel'?.42:.16,kind==='sel'?.42:.16,.045,40),mat);disc.material=mat.clone();disc.material.opacity=kind==='sel'?.72:(kind==='cap'?.62:.58);const p=sqToPos(square);disc.position.set(p.x,.15,p.z);disc.userData={kind:'marker',square};markerRoot.add(disc);pickables.push(disc)}
     function refreshMarkers(){for(let i=pickables.length-1;i>=0;i--)if(pickables[i].userData?.kind==='marker')pickables.splice(i,1);clearMarkers();if(lastMove){markSquare(lastMove.from,'move');markSquare(lastMove.to,'move')}if(selected){markSquare(selected,'sel');for(const m of legal)markSquare(m.to,m.captured?'cap':'move')}}
+    function burstAt(square,color=0xffbd68){
+      const p=sqToPos(square);
+      for(let i=0;i<12;i++){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.035,0),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9}));m.position.set(p.x+.0,.45,p.z);m.userData.v=new THREE.Vector3((Math.random()-.5)*1.8,Math.random()*1.6+.45,(Math.random()-.5)*1.8);m.userData.life=1;fxGroup.add(m)}
+    }
     function updateStatus(){const t=chess.turn()==='w'?'Trắng':'Đen';turnDot.classList.toggle('black',chess.turn()==='b');let s=`${t} đến lượt`;let h='Chạm một quân để xem nước hợp lệ';if(chess.isCheckmate()){s=`Chiếu hết — ${t} thua`;h='Nhấn Ván mới để chơi lại'}else if(chess.isDraw()){s='Ván cờ hòa';h='Nhấn Ván mới để chơi lại'}else if(chess.inCheck()){s=`${t} đang bị chiếu`;h='Hãy bảo vệ Vua'}statusText.textContent=s;hintText.textContent=h}
-    function selectSquare(sq){const pc=chess.get(sq);if(pc&&pc.color===chess.turn()){selected=sq;legal=chess.moves({square:sq,verbose:true});refreshMarkers();return true}return false}
+    function selectSquare(sq){const pc=chess.get(sq);if(pc&&pc.color===chess.turn()){selected=sq;legal=chess.moves({square:sq,verbose:true});refreshMarkers();sfxSelect();return true}return false}
     function needsPromotion(move){return move?.piece==='p'&&(move.to.endsWith('8')||move.to.endsWith('1'))}
     function executeMove(from,to,prom='q'){
       if(animating)return false; let m; try{m=chess.move({from,to,promotion:prom})}catch{return false} if(!m)return false;
-      lastMove={from:m.from,to:m.to}; selected=null; legal=[]; refreshMarkers(); updateStatus();
+      const captured=!!m.captured; lastMove={from:m.from,to:m.to}; selected=null; legal=[]; refreshMarkers(); updateStatus();
+      if(captured){burstAt(to,0xff7d87);sfxCapture()}else sfxMove(); if(chess.inCheck())setTimeout(sfxCheck,100);
       const mover=pieceGroup.children.find(g=>g.userData?.square===from), target=sqToPos(to), start=mover?.position.clone(); animating=true;
-      const duration=280, begun=performance.now();
+      const duration=captured?340:300, begun=performance.now();
       function ease(x){return 1-Math.pow(1-x,3)}
       function step(now){
         const t=Math.min(1,(now-begun)/duration),e=ease(t);
-        if(mover&&start){mover.position.x=THREE.MathUtils.lerp(start.x,target.x,e);mover.position.z=THREE.MathUtils.lerp(start.z,target.z,e);mover.position.y=.08+Math.sin(Math.PI*t)*.42;mover.rotation.y=Math.sin(Math.PI*t)*.08}
+        if(mover&&start){mover.position.x=THREE.MathUtils.lerp(start.x,target.x,e);mover.position.z=THREE.MathUtils.lerp(start.z,target.z,e);mover.position.y=.08+Math.sin(Math.PI*t)*(captured?.62:.44);mover.rotation.y=Math.sin(Math.PI*t)*(captured?.2:.09);const sc=1+Math.sin(Math.PI*t)*.035;mover.scale.setScalar(.94*sc)}
         if(t<1){requestAnimationFrame(step)}else{animating=false;renderPieces();refreshMarkers();updateStatus()}
       } requestAnimationFrame(step); return true
     }
     function onSquare(sq){if(animating||chess.isGameOver())return;if(!selected){selectSquare(sq);return}const mv=legal.find(m=>m.to===sq);if(mv){if(needsPromotion(mv)){pendingPromotion={from:selected,to:sq};promotion.classList.add('show');return}executeMove(selected,sq);return}selected=null;legal=[];refreshMarkers();selectSquare(sq)}
 
-    const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down={x:0,y:0};
-    renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
+    const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down={x:0,y:0};let pointer={x:-2,y:-2};
+    renderer.domElement.addEventListener('pointermove',e=>{const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1});
+    renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}; if(audioCtx?.state==='suspended')audioCtx.resume()});
     renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8)return;const rect=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects(pickables,false)[0];if(hit?.object?.userData?.square)onSquare(hit.object.userData.square)});
     document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(pendingPromotion)executeMove(pendingPromotion.from,pendingPromotion.to,b.dataset.p);pendingPromotion=null;promotion.classList.remove('show')});
-    document.getElementById('reset').onclick=()=>{chess.reset();selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã tạo ván mới')};
+    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♪':'×';showToast(soundOn?'Đã bật âm thanh':'Đã tắt âm thanh')};
+    document.getElementById('reset').onclick=()=>{chess.reset();selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();
+    {
+      const finalPos=new THREE.Vector3(8.8,10.5,10.8),startPos=new THREE.Vector3(0,15.5,17.5),started=performance.now();camera.position.copy(startPos);
+      function intro(now){const t=Math.min(1,(now-started)/1150),e=1-Math.pow(1-t,3);camera.position.lerpVectors(startPos,finalPos,e);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(intro)}requestAnimationFrame(intro)
+    }showToast('Đã tạo ván mới')};
     document.getElementById('undo').onclick=()=>{const m=chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã hoàn tác')}};
     document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8))});
     renderPieces();refreshMarkers();updateStatus();
-    const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);controls.update();const t=clock.getElapsedTime();rim.intensity=20+Math.sin(t*.7)*1.7;fill.intensity=17+Math.sin(t*.53+1)*1.2;halo.material.opacity=.22+Math.sin(t*.8)*.05;world.position.y=Math.sin(t*.55)*.012;renderer.render(scene,camera)}animate();
+    const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);controls.update();const t=clock.getElapsedTime();rim.intensity=20+Math.sin(t*.7)*1.7;fill.intensity=17+Math.sin(t*.53+1)*1.2;halo.material.opacity=.22+Math.sin(t*.8)*.05;world.position.y=Math.sin(t*.55)*.012;
+      for(const m of markerGroup.children){const k=m.userData?.kind;m.scale.setScalar(1+Math.sin(t*3+(m.position.x+m.position.z))*(k==='marker'?.07:.03))}
+      if(!animating){ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(pickables,false).find(h=>h.object.userData?.kind==='piece');const g=hit?.object?.parent; if(hoveredPiece&&hoveredPiece!==g)hoveredPiece.position.y=.08; hoveredPiece=g||null; if(hoveredPiece&&hoveredPiece.userData?.color===chess.turn())hoveredPiece.position.y=.12+Math.sin(t*5)*.025}
+      for(let i=fxGroup.children.length-1;i>=0;i--){const p=fxGroup.children[i];p.position.addScaledVector(p.userData.v,.018);p.userData.v.y-=.055;p.userData.life-=.035;p.material.opacity=Math.max(0,p.userData.life);p.scale.setScalar(.5+p.userData.life*.7);if(p.userData.life<=0)fxGroup.remove(p)}
+      renderer.render(scene,camera)}animate();
   </script>
 </body>
 </html>
