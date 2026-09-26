@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#090d14" />
+  <title>Cờ Vua 3D</title>
+  <style>
+    :root{color-scheme:dark;--glass:rgba(13,18,28,.72);--line:rgba(255,255,255,.12);--text:#f5f7fb;--muted:#aab4c4;--accent:#d6b36a}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090d14;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);touch-action:none}
+    #app,#game{width:100%;height:100%;display:block}#game{position:fixed;inset:0}
+    .glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 14px 48px rgba(0,0,0,.28)}
+    .topbar{position:fixed;z-index:5;top:max(14px,env(safe-area-inset-top));left:14px;right:14px;height:58px;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;justify-content:space-between;pointer-events:auto}
+    .brand{display:flex;align-items:center;gap:10px}.brand-mark{font-size:28px;color:var(--accent)}.brand strong{display:block;font-size:14px;letter-spacing:.18em}.brand small{font-size:9px;color:var(--muted);letter-spacing:.12em}.actions{display:flex;gap:8px}
+    button{font:inherit;color:inherit}.icon-btn,.control-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);cursor:pointer}.icon-btn{width:40px;height:40px;border-radius:13px;font-size:18px}.icon-btn:active,.control-btn:active{transform:scale(.97)}
+    .status{position:fixed;z-index:5;left:14px;bottom:calc(84px + env(safe-area-inset-bottom));min-width:min(360px,calc(100vw - 28px));border-radius:18px;padding:12px 14px;display:flex;gap:11px;align-items:center;pointer-events:none}
+    .dot{width:13px;height:13px;border-radius:999px;background:#f3efe6;box-shadow:0 0 0 3px rgba(255,255,255,.08)}.dot.black{background:#202733}.copy span{display:block;font-size:9px;color:var(--muted);letter-spacing:.16em}.copy strong{display:block;margin-top:1px;font-size:15px}.copy small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+    .controls{position:fixed;z-index:5;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));border-radius:17px;padding:7px;display:flex;gap:7px;pointer-events:auto}.control-btn{height:42px;border-radius:12px;padding:0 14px}.control-btn span{margin-right:5px;color:var(--accent)}
+    .badge{position:fixed;z-index:5;right:16px;top:86px;padding:7px 10px;border-radius:999px;font-size:10px;color:#cbd4df;pointer-events:none}
+    .toast{position:fixed;z-index:10;left:50%;top:90px;transform:translateX(-50%);padding:9px 13px;border-radius:12px;background:#111827;border:1px solid var(--line);font-size:12px;opacity:0;transition:.2s;pointer-events:none}.toast.show{opacity:1}
+    .promotion{position:fixed;z-index:20;inset:0;display:none;place-items:center;background:rgba(0,0,0,.4);padding:20px}.promotion.show{display:grid}.promotion-card{width:min(360px,100%);border-radius:20px;padding:16px}.promotion-card h3{margin:0 0 12px;font-size:15px}.promotion-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.promotion-grid button{height:70px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.07);font-size:30px;cursor:pointer}.promotion-grid small{display:block;font-size:9px;color:var(--muted);margin-top:2px}
+    @media(max-width:640px){.badge{display:none}.topbar{height:54px}.brand strong{font-size:12px}.status{bottom:calc(75px + env(safe-area-inset-bottom));min-width:0;right:14px}.controls{left:14px;right:auto}.control-btn{padding:0 12px;font-size:12px}}
+  </style>
+  <script type="importmap">
+  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <header class="topbar glass">
+    <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
+    <div class="actions"><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
+  </header>
+  <div class="badge glass">Kéo xoay · Chụm zoom · Chạm để đi</div>
+  <section class="status glass">
+    <div id="turnDot" class="dot"></div><div class="copy"><span>LƯỢT ĐI</span><strong id="statusText">Trắng đi trước</strong><small id="hintText">Chạm một quân để xem nước hợp lệ</small></div>
+  </section>
+  <div class="controls glass"><button id="undo" class="control-btn"><span>↶</span>Hoàn tác</button><button id="reset" class="control-btn"><span>⟳</span>Ván mới</button></div>
+  <div id="toast" class="toast"></div>
+  <div id="promotion" class="promotion"><div class="promotion-card glass"><h3>Phong cấp tốt</h3><div class="promotion-grid"><button data-p="q">♛<small>Hậu</small></button><button data-p="r">♜<small>Xe</small></button><button data-p="b">♝<small>Tượng</small></button><button data-p="n">♞<small>Mã</small></button></div></div></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm';
+
+    const canvas=document.getElementById('game');
+    const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
+    renderer.setPixelRatio(Math.min(devicePixelRatio,1.8)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace;
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(0x090d14); scene.fog=new THREE.Fog(0x090d14,17,34);
+    const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,80); camera.position.set(8.8,10.5,10.8);
+    const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.065; controls.target.set(0,.25,0); controls.minDistance=8.5; controls.maxDistance=21; controls.maxPolarAngle=Math.PI*.47; controls.minPolarAngle=.28;
+    const hemi=new THREE.HemisphereLight(0xbfd8ff,0x1d140d,1.65); scene.add(hemi);
+    const key=new THREE.DirectionalLight(0xffefd0,3.0); key.position.set(7,12,7); key.castShadow=true; key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-10;key.shadow.camera.right=10;key.shadow.camera.top=10;key.shadow.camera.bottom=-10; scene.add(key);
+    const rim=new THREE.PointLight(0x527cff,14,22,2); rim.position.set(-7,5,-4); scene.add(rim);
+
+    const world=new THREE.Group(); scene.add(world);
+    const boardGroup=new THREE.Group(); world.add(boardGroup);
+    const pieceGroup=new THREE.Group(); world.add(pieceGroup);
+    const markerGroup=new THREE.Group(); world.add(markerGroup);
+    const pickables=[]; const squareMeshes=[];
+    const boardBase=new THREE.Mesh(new THREE.BoxGeometry(9.25,.42,9.25),new THREE.MeshStandardMaterial({color:0x171b23,roughness:.28,metalness:.68})); boardBase.position.y=-.27; boardBase.castShadow=true; boardBase.receiveShadow=true; boardGroup.add(boardBase);
+    const lip=new THREE.Mesh(new THREE.BoxGeometry(8.75,.16,8.75),new THREE.MeshStandardMaterial({color:0x9b753c,roughness:.34,metalness:.72})); lip.position.y=-.03; boardGroup.add(lip);
+    const lightMat=new THREE.MeshStandardMaterial({color:0xd7d1c2,roughness:.72,metalness:.05}); const darkMat=new THREE.MeshStandardMaterial({color:0x445162,roughness:.64,metalness:.12});
+    const selMat=new THREE.MeshBasicMaterial({color:0xffcf62,transparent:true,opacity:.58,depthWrite:false}); const moveMat=new THREE.MeshBasicMaterial({color:0x63d7ff,transparent:true,opacity:.55,depthWrite:false}); const capMat=new THREE.MeshBasicMaterial({color:0xff6c79,transparent:true,opacity:.52,depthWrite:false});
+    function sqToPos(s){const f=s.charCodeAt(0)-97, r=Number(s[1])-1;return new THREE.Vector3(f-3.5,.065,3.5-r)}
+    function posToSq(f,r){return String.fromCharCode(97+f)+(r+1)}
+    for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+      const sq=posToSq(f,r); const m=new THREE.Mesh(new THREE.BoxGeometry(.98,.12,.98),(f+r)%2===0?lightMat:darkMat); const p=sqToPos(sq); m.position.set(p.x,0,p.z);m.receiveShadow=true;m.userData={kind:'square',square:sq};boardGroup.add(m);squareMeshes.push(m);pickables.push(m);
+    }
+    const floor=new THREE.Mesh(new THREE.CircleGeometry(18,72),new THREE.MeshStandardMaterial({color:0x0b1018,roughness:.9,metalness:.1})); floor.rotation.x=-Math.PI/2;floor.position.y=-.49;floor.receiveShadow=true;scene.add(floor);
+    const ring=new THREE.Mesh(new THREE.RingGeometry(7.5,13,96),new THREE.MeshBasicMaterial({color:0x1b2636,transparent:true,opacity:.22,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=-.47;scene.add(ring);
+
+    const whiteMat=new THREE.MeshStandardMaterial({color:0xece7dc,roughness:.27,metalness:.52}); const blackMat=new THREE.MeshStandardMaterial({color:0x242c39,roughness:.24,metalness:.62}); const goldMat=new THREE.MeshStandardMaterial({color:0xc69a52,roughness:.25,metalness:.8});
+    const geo={
+      cyl:(a,b,h,n=28)=>new THREE.CylinderGeometry(a,b,h,n), sphere:(r,ws=24,hs=16)=>new THREE.SphereGeometry(r,ws,hs), cone:(r,h,n=28)=>new THREE.ConeGeometry(r,h,n), box:(x,y,z)=>new THREE.BoxGeometry(x,y,z), torus:(r,t)=>new THREE.TorusGeometry(r,t,12,32)
+    };
+    function part(g,mat,y=0,rotX=0,rotZ=0){const m=new THREE.Mesh(g,mat);m.position.y=y;m.rotation.x=rotX;m.rotation.z=rotZ;m.castShadow=true;m.receiveShadow=true;return m}
+    function makePiece(type,color,square){
+      const mat=color==='w'?whiteMat:blackMat, g=new THREE.Group(); g.userData={kind:'piece',square,color,type};
+      g.add(part(geo.cyl(.38,.48,.13),goldMat,.09)); g.add(part(geo.cyl(.31,.38,.12),mat,.21));
+      if(type==='p'){g.add(part(geo.cyl(.18,.27,.42),mat,.47));g.add(part(geo.sphere(.19),mat,.76));}
+      if(type==='r'){g.add(part(geo.cyl(.27,.33,.52),mat,.48));g.add(part(geo.box(.58,.16,.58),mat,.78));for(const [x,z] of [[.2,.2],[-.2,.2],[.2,-.2],[-.2,-.2]]){const c=part(geo.box(.13,.19,.13),mat,.94);c.position.x=x;c.position.z=z;g.add(c)}}
+      if(type==='n'){g.add(part(geo.cyl(.21,.3,.33),mat,.41));const neck=part(geo.box(.28,.6,.3),mat,.73,0,-.23);neck.position.x=.1;g.add(neck);const head=part(geo.sphere(.25,20,14),mat,1.03);head.scale.set(1.15,.8,.8);head.position.x=.18;g.add(head);const snout=part(geo.box(.28,.18,.22),mat,1.02,0,-.05);snout.position.x=.38;g.add(snout)}
+      if(type==='b'){g.add(part(geo.cyl(.18,.3,.42),mat,.48));g.add(part(geo.sphere(.27,28,18),mat,.79));const tip=part(geo.cone(.13,.3),goldMat,1.08);tip.rotation.z=.28;g.add(tip)}
+      if(type==='q'){g.add(part(geo.cyl(.2,.32,.5),mat,.52));g.add(part(geo.sphere(.23),mat,.88));g.add(part(geo.torus(.25,.055),goldMat,1.02,Math.PI/2));for(let i=0;i<6;i++){const c=part(geo.sphere(.055),goldMat,1.12);const a=i*Math.PI/3;c.position.x=Math.cos(a)*.22;c.position.z=Math.sin(a)*.22;g.add(c)}}
+      if(type==='k'){g.add(part(geo.cyl(.2,.32,.54),mat,.54));g.add(part(geo.sphere(.22),mat,.9));const v=part(geo.box(.11,.38,.11),goldMat,1.18);g.add(v);const h=part(geo.box(.32,.1,.11),goldMat,1.24);g.add(h)}
+      const p=sqToPos(square);g.position.set(p.x,.08,p.z); g.traverse(o=>{if(o.isMesh){o.userData=g.userData;pickables.push(o)}});return g;
+    }
+
+    const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false;
+    const statusText=document.getElementById('statusText'), hintText=document.getElementById('hintText'), turnDot=document.getElementById('turnDot'), markerRoot=markerGroup, promotion=document.getElementById('promotion'), toast=document.getElementById('toast');
+    function clearPieces(){for(let i=pieceGroup.children.length-1;i>=0;i--)pieceGroup.remove(pieceGroup.children[i]);for(let i=pickables.length-1;i>=0;i--){if(pickables[i].userData?.kind==='piece')pickables.splice(i,1)}}
+    function renderPieces(){clearPieces();const b=chess.board();for(let r=0;r<8;r++)for(let f=0;f<8;f++){const pc=b[r][f];if(!pc)continue;const sq=String.fromCharCode(97+f)+(8-r);pieceGroup.add(makePiece(pc.type,pc.color,sq))}}
+    function clearMarkers(){markerRoot.clear()}
+    function markSquare(square,kind){const mat=kind==='sel'?selMat:kind==='cap'?capMat:moveMat;const disc=new THREE.Mesh(new THREE.CylinderGeometry(kind==='sel'?.39:.16,kind==='sel'?.39:.16,.045,32),mat);const p=sqToPos(square);disc.position.set(p.x,.15,p.z);disc.userData={kind:'marker',square};markerRoot.add(disc);pickables.push(disc)}
+    function refreshMarkers(){for(let i=pickables.length-1;i>=0;i--)if(pickables[i].userData?.kind==='marker')pickables.splice(i,1);clearMarkers();if(lastMove){markSquare(lastMove.from,'move');markSquare(lastMove.to,'move')}if(selected){markSquare(selected,'sel');for(const m of legal)markSquare(m.to,m.captured?'cap':'move')}}
+    function updateStatus(){const t=chess.turn()==='w'?'Trắng':'Đen';turnDot.classList.toggle('black',chess.turn()==='b');let s=`${t} đến lượt`;let h='Chạm một quân để xem nước hợp lệ';if(chess.isCheckmate()){s=`Chiếu hết — ${t} thua`;h='Nhấn Ván mới để chơi lại'}else if(chess.isDraw()){s='Ván cờ hòa';h='Nhấn Ván mới để chơi lại'}else if(chess.inCheck()){s=`${t} đang bị chiếu`;h='Hãy bảo vệ Vua'}statusText.textContent=s;hintText.textContent=h}
+    function selectSquare(sq){const pc=chess.get(sq);if(pc&&pc.color===chess.turn()){selected=sq;legal=chess.moves({square:sq,verbose:true});refreshMarkers();return true}return false}
+    function needsPromotion(move){return move?.piece==='p'&&(move.to.endsWith('8')||move.to.endsWith('1'))}
+    function executeMove(from,to,prom='q'){let m;try{m=chess.move({from,to,promotion:prom})}catch{return false}if(!m)return false;lastMove={from:m.from,to:m.to};selected=null;legal=[];renderPieces();refreshMarkers();updateStatus();return true}
+    function onSquare(sq){if(chess.isGameOver())return;if(!selected){selectSquare(sq);return}const mv=legal.find(m=>m.to===sq);if(mv){if(needsPromotion(mv)){pendingPromotion={from:selected,to:sq};promotion.classList.add('show');return}executeMove(selected,sq);return}selected=null;legal=[];refreshMarkers();selectSquare(sq)}
+
+    const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down={x:0,y:0};
+    renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
+    renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8)return;const rect=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects(pickables,false)[0];if(hit?.object?.userData?.square)onSquare(hit.object.userData.square)});
+    document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(pendingPromotion)executeMove(pendingPromotion.from,pendingPromotion.to,b.dataset.p);pendingPromotion=null;promotion.classList.remove('show')});
+    document.getElementById('reset').onclick=()=>{chess.reset();selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã tạo ván mới')};
+    document.getElementById('undo').onclick=()=>{const m=chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã hoàn tác')}};
+    document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
+    function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8))});
+    renderPieces();refreshMarkers();updateStatus();
+    const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);controls.update();const t=clock.getElapsedTime();rim.intensity=13+Math.sin(t*.7)*1.2;renderer.render(scene,camera)}animate();
+  </script>
+</body>
+</html>
