@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#090d14" />
-  <title>Cờ Vua 3D — Classic Wood</title>
+  <title>Cờ Vua 3D — Staunton HD</title>
   <style>
     :root{color-scheme:dark;--glass:rgba(8,13,22,.62);--line:rgba(255,228,177,.16);--text:#fffaf0;--muted:#aeb8c9;--accent:#e5bd72;--accent2:#8bd6ff;--danger:#ff7d87}
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 12%,#182234 0,#090d14 48%,#05070b 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);touch-action:none}
@@ -31,7 +31,7 @@
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>CLASSIC WOOD EDITION · BUILD 10BE1DE</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · GLB EDITION · BUILD HD01</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
     <div class="actions"><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
@@ -46,6 +46,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm';
 
     const MOBILE=innerWidth<700 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); const REDUCED=MOBILE || (navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4);
@@ -103,6 +104,133 @@
       lathe:(pts)=>new THREE.LatheGeometry(pts.map(([x,y])=>new THREE.Vector2(x,y)),MOBILE?22:36)
     };
     function part(g,mat,y=0,rotX=0,rotZ=0){const m=new THREE.Mesh(g,mat);m.position.y=y;m.rotation.x=rotX;m.rotation.z=rotZ;m.castShadow=!MOBILE;m.receiveShadow=!MOBILE;return m}
+    const HD_MODEL_URL='https://cdn.3dassets.dev/assets/19484/v1/model.glb';
+    const hdTemplates={w:{},b:{}};
+    let hdReady=false, hdLoading=false;
+    function setPieceMeta(root,meta){
+      root.userData={...meta};
+      root.traverse(o=>{if(o.isMesh){o.userData={...meta};o.castShadow=!MOBILE;o.receiveShadow=!MOBILE}});
+    }
+    function woodify(root,color){
+      const wood=color==='w'?whiteMat:blackMat;
+      root.traverse(o=>{if(o.isMesh){o.material=wood;o.castShadow=!MOBILE;o.receiveShadow=!MOBILE}});
+    }
+    function cloneHD(type,color,square){
+      const tpl=hdTemplates[color]?.[type];
+      if(!tpl)return null;
+      const g=tpl.clone(true);
+      woodify(g,color);
+      setPieceMeta(g,{kind:'piece',square,color,type});
+      const p=sqToPos(square);g.position.set(p.x,.08,p.z);g.scale.setScalar(20);
+      if(type==='n')g.rotation.y=color==='w'?Math.PI:0;
+      g.traverse(o=>{if(o.isMesh)pickables.push(o)});
+      return g;
+    }
+    function clusterPieceMeshes(sceneRoot){
+      sceneRoot.updateMatrixWorld(true);
+      const items=[];
+      sceneRoot.traverse(o=>{
+        if(!o.isMesh)return;
+        const box=new THREE.Box3().setFromObject(o), size=new THREE.Vector3(), center=new THREE.Vector3();
+        box.getSize(size); box.getCenter(center);
+        if(size.y<.008 || size.y>.13 || size.x>.085 || size.z>.085)return;
+        items.push({mesh:o,box,size,center});
+      });
+      const clusters=[];
+      for(const it of items){
+        let best=null,bestD=Infinity;
+        for(const c of clusters){
+          const d=Math.hypot(it.center.x-c.cx,it.center.z-c.cz);
+          if(d<.021&&d<bestD){best=c;bestD=d}
+        }
+        if(!best){best={items:[],cx:it.center.x,cz:it.center.z};clusters.push(best)}
+        best.items.push(it);
+        best.cx=best.items.reduce((a,x)=>a+x.center.x,0)/best.items.length;
+        best.cz=best.items.reduce((a,x)=>a+x.center.z,0)/best.items.length;
+      }
+      return clusters.map(c=>{
+        const box=new THREE.Box3();
+        for(const it of c.items)box.union(it.box);
+        const size=new THREE.Vector3(),center=new THREE.Vector3();box.getSize(size);box.getCenter(center);
+        return {...c,box,size,center,minY:box.min.y};
+      }).filter(c=>c.size.y>.035&&c.size.y<.125&&c.size.x<.075&&c.size.z<.075);
+    }
+    function buildTemplateFromCluster(cluster){
+      const g=new THREE.Group();
+      const inv=new THREE.Matrix4().makeTranslation(-cluster.center.x,-cluster.minY,-cluster.center.z);
+      for(const it of cluster.items){
+        const c=it.mesh.clone();
+        c.matrixAutoUpdate=false;
+        c.matrix.copy(inv).multiply(it.mesh.matrixWorld);
+        c.matrix.decompose(c.position,c.quaternion,c.scale);
+        c.matrixAutoUpdate=true;
+        g.add(c);
+      }
+      return g;
+    }
+    function uniqueAxis(values,tol=.018){
+      const out=[];
+      for(const v of [...values].sort((a,b)=>a-b)){
+        if(!out.length||Math.abs(v-out[out.length-1])>tol)out.push(v);
+        else out[out.length-1]=(out[out.length-1]+v)/2;
+      }
+      return out;
+    }
+    function installHDTemplates(root){
+      const clusters=clusterPieceMeshes(root);
+      if(clusters.length<28)throw new Error('Not enough chess-piece clusters: '+clusters.length);
+      const cx=clusters.reduce((a,c)=>a+c.center.x,0)/clusters.length;
+      const cz=clusters.reduce((a,c)=>a+c.center.z,0)/clusters.length;
+      const xs=uniqueAxis(clusters.map(c=>c.center.x));
+      if(xs.length<8)throw new Error('Could not resolve 8 files');
+      const sideRows={w:[],b:[]};
+      for(const c of clusters){const color=c.center.z>=cz?'w':'b';sideRows[color].push(Math.abs(c.center.z-cz))}
+      const rowCut={};
+      for(const color of ['w','b']){
+        const zs=uniqueAxis(sideRows[color],.012).sort((a,b)=>a-b);
+        rowCut[color]=zs.length>1?(zs[0]+zs[zs.length-1])/2:0;
+      }
+      const classified=[];
+      for(const c of clusters){
+        const color=c.center.z>=cz?'w':'b';
+        const xi=xs.reduce((best,x,i)=>Math.abs(c.center.x-x)<Math.abs(c.center.x-xs[best])?i:best,0);
+        const back=Math.abs(c.center.z-cz)>rowCut[color];
+        let type='p';
+        if(back){
+          if(xi===0||xi===7)type='r';
+          else if(xi===1||xi===6)type='n';
+          else if(xi===2||xi===5)type='b';
+          else type='center';
+        }
+        classified.push({c,color,xi,type});
+      }
+      for(const color of ['w','b']){
+        const centers=classified.filter(x=>x.color===color&&x.type==='center');
+        centers.sort((a,b)=>b.c.size.y-a.c.size.y);
+        if(centers[0])centers[0].type='k';
+        if(centers[1])centers[1].type='q';
+      }
+      for(const x of classified){
+        if(x.type==='center'||hdTemplates[x.color][x.type])continue;
+        const tpl=buildTemplateFromCluster(x.c);
+        woodify(tpl,x.color);
+        hdTemplates[x.color][x.type]=tpl;
+      }
+      const ok=['p','r','n','b','q','k'].every(t=>hdTemplates.w[t]&&hdTemplates.b[t]);
+      if(!ok)throw new Error('Missing one or more HD templates');
+      hdReady=true;
+    }
+    async function loadHDSet(){
+      if(hdLoading||hdReady)return;hdLoading=true;
+      showToast('Đang tải bộ quân Staunton HD…');
+      new GLTFLoader().load(HD_MODEL_URL,gltf=>{
+        try{
+          installHDTemplates(gltf.scene);
+          renderPieces();refreshMarkers();
+          showToast('Đã tải bộ quân Staunton HD');
+        }catch(err){console.warn('HD chess set fallback',err);showToast('Dùng bộ quân dự phòng')}
+      },undefined,err=>{console.warn('HD chess set load failed',err);showToast('Dùng bộ quân dự phòng')});
+    }
     function baseBody(mat){
       const g=new THREE.Group();
       g.add(part(geo.lathe([[.34,0],[.46,.05],[.49,.12],[.42,.18],[.36,.22],[.34,.29],[.28,.34]]),mat,.02));
@@ -120,6 +248,7 @@
       const tip=part(geo.cone(.07,.22,18),mat,y+.47);tip.rotation.z=.08;g.add(tip);return g
     }
     function makePiece(type,color,square){
+      if(hdReady){const hd=cloneHD(type,color,square);if(hd)return hd}
       const mat=color==='w'?whiteMat:blackMat;
       const accent=mat;
       const g=new THREE.Group();
@@ -237,6 +366,7 @@
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.15:1.6))});
     renderPieces();refreshMarkers();updateStatus();
+    loadHDSet();
     const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);controls.update();const t=clock.getElapsedTime();rim.intensity=20+Math.sin(t*.7)*1.7;fill.intensity=17+Math.sin(t*.53+1)*1.2;halo.material.opacity=.22+Math.sin(t*.8)*.05;world.position.y=MOBILE?0:Math.sin(t*.55)*.012;
       for(const m of markerGroup.children){const k=m.userData?.kind;m.scale.setScalar(1+Math.sin(t*3+(m.position.x+m.position.z))*(k==='marker'?.07:.03))}
       if(!MOBILE&&!animating){ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(pickables,false).find(h=>h.object.userData?.kind==='piece');const g=hit?.object?.parent; if(hoveredPiece&&hoveredPiece!==g)hoveredPiece.position.y=.08; hoveredPiece=g||null; if(hoveredPiece&&hoveredPiece.userData?.color===chess.turn())hoveredPiece.position.y=.12+Math.sin(t*5)*.025}
