@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#090d14" />
-  <title>Cờ Vua 3D — Staunton HD LIVE</title>
+  <title>Cờ Vua 3D — Staunton HD AI</title>
   <style>
     :root{color-scheme:dark;--glass:rgba(8,13,22,.62);--line:rgba(255,228,177,.16);--text:#fffaf0;--muted:#aeb8c9;--accent:#e5bd72;--accent2:#8bd6ff;--danger:#ff7d87}
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 12%,#182234 0,#090d14 48%,#05070b 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);touch-action:none}
@@ -25,16 +25,24 @@
     .luxury-title span{display:block;margin-top:6px;font-size:9px;letter-spacing:.38em;color:#8391a6}
     .edge-vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(circle at 50% 48%,transparent 42%,rgba(0,0,0,.16) 72%,rgba(0,0,0,.46) 100%)}
     @media(max-width:640px){.luxury-title{top:84px}.luxury-title b{font-size:18px;letter-spacing:.2em}.luxury-title span{font-size:7px;letter-spacing:.28em}}
+  
+    .mode-overlay{position:fixed;z-index:30;inset:0;display:none;place-items:center;padding:20px;background:rgba(3,6,10,.66);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .mode-overlay.show{display:grid}.mode-card{width:min(430px,100%);border-radius:24px;padding:18px}.mode-card h2{margin:0;font-family:Georgia,serif;font-size:25px;font-weight:500;letter-spacing:.04em}.mode-card>p{margin:6px 0 16px;color:var(--muted);font-size:12px}
+    .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mode-choice{min-height:88px;border-radius:17px;border:1px solid var(--line);background:rgba(255,255,255,.055);color:var(--text);text-align:left;padding:13px;cursor:pointer}.mode-choice.active{border-color:rgba(229,189,114,.72);background:rgba(229,189,114,.12);box-shadow:0 0 0 1px rgba(229,189,114,.18) inset}.mode-choice b{display:block;font-size:14px}.mode-choice small{display:block;color:var(--muted);margin-top:5px;line-height:1.35}
+    .ai-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.ai-settings.hidden{display:none}.field{display:flex;flex-direction:column;gap:6px}.field span{font-size:9px;color:var(--muted);letter-spacing:.13em}.field select{height:42px;border-radius:12px;border:1px solid var(--line);background:#111824;color:var(--text);padding:0 10px;font:inherit}
+    .start-game{width:100%;height:48px;margin-top:14px;border:1px solid rgba(229,189,114,.45);border-radius:14px;background:linear-gradient(180deg,#b98847,#84602f);color:#fff8ea;font-weight:700;letter-spacing:.04em;cursor:pointer}.mode-note{margin-top:10px;color:#8190a4;font-size:10px;text-align:center}
+    @media(max-width:640px){.mode-card{padding:16px}.mode-choice{min-height:82px}.mode-grid{gap:8px}}
+
   </style>
   <script type="importmap">
   {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · GLB EDITION · BUILD HD01-LIVE</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD02</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
-    <div class="actions"><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
+    <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
   </header>
   <div class="badge glass">Kéo xoay · Chụm zoom · Chạm để đi</div>
   <section class="status glass">
@@ -42,6 +50,23 @@
   </section>
   <div class="controls glass"><button id="undo" class="control-btn"><span>↶</span>Hoàn tác</button><button id="reset" class="control-btn"><span>⟳</span>Ván mới</button></div>
   <div id="toast" class="toast"></div>
+
+  <div id="modeOverlay" class="mode-overlay show">
+    <div class="mode-card glass">
+      <h2>Chọn chế độ chơi</h2>
+      <p>Chơi cùng người bên cạnh hoặc đấu với máy ngay trên thiết bị.</p>
+      <div class="mode-grid">
+        <button class="mode-choice" data-mode="local"><b>👥 Hai người</b><small>Hai bên thay phiên trên cùng thiết bị</small></button>
+        <button class="mode-choice active" data-mode="ai"><b>♟ Đấu máy</b><small>AI tự tính và phản hồi sau nước của anh</small></button>
+      </div>
+      <div id="aiSettings" class="ai-settings">
+        <label class="field"><span>ĐỘ KHÓ</span><select id="aiLevel"><option value="easy">Dễ</option><option value="medium" selected>Vừa</option><option value="hard">Khó</option></select></label>
+        <label class="field"><span>ANH CHƠI BÊN</span><select id="humanSide"><option value="w" selected>Trắng</option><option value="b">Đen</option><option value="random">Ngẫu nhiên</option></select></label>
+      </div>
+      <button id="startGame" class="start-game">BẮT ĐẦU VÁN</button>
+      <div class="mode-note">AI chạy hoàn toàn trong trình duyệt · Không cần tài khoản</div>
+    </div>
+  </div>
   <div id="promotion" class="promotion"><div class="promotion-card glass"><h3>Phong cấp tốt</h3><div class="promotion-grid"><button data-p="q">♛<small>Hậu</small></button><button data-p="r">♜<small>Xe</small></button><button data-p="b">♝<small>Tượng</small></button><button data-p="n">♞<small>Mã</small></button></div></div></div>
   <script type="module">
     import * as THREE from 'three';
@@ -52,16 +77,16 @@
     const MOBILE=innerWidth<700 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); const REDUCED=MOBILE || (navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4);
     const canvas=document.getElementById('game');
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
-    renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.15:1.6)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=MOBILE?THREE.PCFShadowMap:THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.16;
+    renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.32;
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0x070b12); scene.fog=new THREE.FogExp2(0x070b12,.036);
     const camera=new THREE.PerspectiveCamera(innerWidth<640?38:42,innerWidth/innerHeight,.1,80); camera.position.set(innerWidth<640?7.6:8.8,innerWidth<640?9.2:10.5,innerWidth<640?9.4:10.8);
     const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.065; controls.target.set(0,.25,0); controls.minDistance=8.5; controls.maxDistance=21; controls.maxPolarAngle=Math.PI*.47; controls.minPolarAngle=.28;
-    const hemi=new THREE.HemisphereLight(0xcfe4ff,0x170d08,1.35); scene.add(hemi);
-    const key=new THREE.DirectionalLight(0xffe0a8,4.0); key.position.set(7,13,7); key.castShadow=true; key.shadow.mapSize.set(MOBILE?768:1536,MOBILE?768:1536); key.shadow.bias=-.0004; key.shadow.normalBias=.03; key.shadow.camera.left=-10;key.shadow.camera.right=10;key.shadow.camera.top=10;key.shadow.camera.bottom=-10; scene.add(key);
-    const fill=new THREE.PointLight(0xffa85a,18,24,2); fill.position.set(7,3,-7); scene.add(fill);
-    const rim=new THREE.PointLight(0x4aa8ff,22,25,2); rim.position.set(-8,6,-5); scene.add(rim);
+    const hemi=new THREE.HemisphereLight(0xe6f0ff,0x2b1b12,1.75); scene.add(hemi);
+    const key=new THREE.DirectionalLight(0xffe5bc,3.6); key.position.set(7,13,7); key.castShadow=true; key.shadow.mapSize.set(MOBILE?1024:2048,MOBILE?1024:2048); key.shadow.bias=-.0004; key.shadow.normalBias=.03; key.shadow.camera.left=-10;key.shadow.camera.right=10;key.shadow.camera.top=10;key.shadow.camera.bottom=-10; scene.add(key);
+    const fill=new THREE.PointLight(0xffd1a1,12,26,2); fill.position.set(6,4,-6); scene.add(fill);
+    const rim=new THREE.PointLight(0xaecfff,12,26,2); rim.position.set(-7,6,-5); scene.add(rim);
     const crownLight=new THREE.SpotLight(0xffd38b,34,30,Math.PI*.22,.55,1.5); crownLight.position.set(0,13,2); crownLight.target.position.set(0,0,0); scene.add(crownLight,crownLight.target);
-    const frontFill=new THREE.DirectionalLight(0xfff0d8,MOBILE?1.25:1.05); frontFill.position.set(0,7,10); frontFill.castShadow=false; scene.add(frontFill);
+    const frontFill=new THREE.DirectionalLight(0xfff4df,MOBILE?1.55:1.35); frontFill.position.set(0,7,10); frontFill.castShadow=false; scene.add(frontFill);
 
     const world=new THREE.Group(); scene.add(world);
     const boardGroup=new THREE.Group(); world.add(boardGroup);
@@ -76,7 +101,7 @@
     const lip=new THREE.Mesh(new THREE.BoxGeometry(8.86,.18,8.86),brassMat); lip.position.y=-.055; lip.castShadow=true; boardGroup.add(lip);
     const innerFrame=new THREE.Mesh(new THREE.BoxGeometry(8.32,.10,8.32),new THREE.MeshStandardMaterial({color:0x1c2029,roughness:.3,metalness:.66})); innerFrame.position.y=.005; boardGroup.add(innerFrame);
     for(const [x,z] of [[-4.45,-4.45],[-4.45,4.45],[4.45,-4.45],[4.45,4.45]]){const stud=new THREE.Mesh(new THREE.CylinderGeometry(.13,.16,.08,32),brassMat);stud.position.set(x,-.02,z);stud.castShadow=true;boardGroup.add(stud)}
-    const lightMat=new THREE.MeshPhysicalMaterial({color:0xd8d0bd,roughness:.46,metalness:.08,clearcoat:.3,clearcoatRoughness:.5}); const darkMat=new THREE.MeshPhysicalMaterial({color:0x354251,roughness:.42,metalness:.22,clearcoat:.38,clearcoatRoughness:.42});
+    const lightMat=new THREE.MeshPhysicalMaterial({color:0xe9dfc9,roughness:.40,metalness:.02,clearcoat:.38,clearcoatRoughness:.32}); const darkMat=new THREE.MeshPhysicalMaterial({color:0x4a535d,roughness:.44,metalness:.05,clearcoat:.30,clearcoatRoughness:.38});
     const selMat=new THREE.MeshBasicMaterial({color:0xffcf62,transparent:true,opacity:.58,depthWrite:false}); const moveMat=new THREE.MeshBasicMaterial({color:0x63d7ff,transparent:true,opacity:.55,depthWrite:false}); const capMat=new THREE.MeshBasicMaterial({color:0xff6c79,transparent:true,opacity:.52,depthWrite:false});
     function sqToPos(s){const f=s.charCodeAt(0)-97, r=Number(s[1])-1;return new THREE.Vector3(f-3.5,.065,3.5-r)}
     function posToSq(f,r){return String.fromCharCode(97+f)+(r+1)}
@@ -92,8 +117,8 @@
     const archMat=new THREE.MeshBasicMaterial({color:0x274e70,transparent:true,opacity:.08,side:THREE.DoubleSide});
     for(let i=0;i<(MOBILE?1:3);i++){const a=new THREE.Mesh(new THREE.TorusGeometry(10+i*1.4,.045,MOBILE?5:8,MOBILE?40:96,Math.PI),archMat);a.rotation.z=Math.PI/2;a.position.y=3+i*.5;scene.add(a)}
 
-    const whiteMat=new THREE.MeshPhysicalMaterial({color:0xd7a35b,roughness:.34,metalness:.02,clearcoat:.72,clearcoatRoughness:.24});
-    const blackMat=new THREE.MeshPhysicalMaterial({color:0x5a3022,roughness:.32,metalness:.02,clearcoat:.78,clearcoatRoughness:.22});
+    const whiteMat=new THREE.MeshPhysicalMaterial({color:0xe3c386,roughness:.22,metalness:.01,clearcoat:.95,clearcoatRoughness:.08});
+    const blackMat=new THREE.MeshPhysicalMaterial({color:0x7a4630,roughness:.24,metalness:.01,clearcoat:.95,clearcoatRoughness:.08});
     const goldMat=new THREE.MeshStandardMaterial({color:0xb98a50,roughness:.38,metalness:.06});
     const insetWhite=new THREE.MeshStandardMaterial({color:0xfff7e6,roughness:.2,metalness:.15,emissive:0x2c2416,emissiveIntensity:.15});
     const insetBlack=new THREE.MeshStandardMaterial({color:0x28384f,roughness:.18,metalness:.62,emissive:0x071424,emissiveIntensity:.35});
@@ -313,6 +338,80 @@
     }
 
     const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false; let animating=false; let soundOn=true; let hoveredPiece=null;
+    let gameMode='ai', aiLevel='medium', humanColor='w', aiColor='b', aiThinking=false;
+    const modeOverlay=document.getElementById('modeOverlay'), aiSettings=document.getElementById('aiSettings'), modeBtn=document.getElementById('modeBtn');
+    const PIECE_VALUE={p:100,n:320,b:330,r:500,q:900,k:20000};
+    function boardEvalFor(color){
+      let score=0; const board=chess.board();
+      for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=board[r][f];if(!p)continue;
+        let v=PIECE_VALUE[p.type]||0;
+        const center=3.5-(Math.abs(3.5-f)+Math.abs(3.5-r))/2;
+        if(p.type==='p'||p.type==='n'||p.type==='b')v+=center*4;
+        if(p.type==='q'||p.type==='k')v+=center*.6;
+        score+=(p.color===color?v:-v);
+      }
+      return score;
+    }
+    function terminalScore(ai){
+      if(chess.isCheckmate())return chess.turn()===ai?-999999:999999;
+      if(chess.isDraw())return 0;
+      return null;
+    }
+    function minimax(depth,alpha,beta,ai,start,budget){
+      const term=terminalScore(ai); if(term!==null)return term;
+      if(depth<=0 || performance.now()-start>budget)return boardEvalFor(ai);
+      const moves=chess.moves({verbose:true});
+      const maximize=chess.turn()===ai;
+      let best=maximize?-Infinity:Infinity;
+      // captures first improves pruning
+      moves.sort((a,b)=>(b.captured?PIECE_VALUE[b.captured]:0)-(a.captured?PIECE_VALUE[a.captured]:0));
+      for(const m of moves){
+        chess.move({from:m.from,to:m.to,promotion:m.promotion||'q'});
+        const score=minimax(depth-1,alpha,beta,ai,start,budget);
+        chess.undo();
+        if(maximize){best=Math.max(best,score);alpha=Math.max(alpha,best)}else{best=Math.min(best,score);beta=Math.min(beta,best)}
+        if(beta<=alpha || performance.now()-start>budget)break;
+      }
+      return best;
+    }
+    function chooseAIMove(){
+      const moves=chess.moves({verbose:true}); if(!moves.length)return null;
+      if(aiLevel==='easy'){
+        // mostly random, but occasionally takes a hanging piece.
+        const captures=moves.filter(m=>m.captured);
+        if(captures.length&&Math.random()<.45)return captures[Math.floor(Math.random()*captures.length)];
+        return moves[Math.floor(Math.random()*moves.length)];
+      }
+      const depth=aiLevel==='hard'?(MOBILE?2:3):2;
+      const budget=aiLevel==='hard'?(MOBILE?260:520):(MOBILE?140:260);
+      const start=performance.now(); let best=-Infinity,bestMoves=[];
+      const ordered=[...moves].sort((a,b)=>(b.captured?PIECE_VALUE[b.captured]:0)-(a.captured?PIECE_VALUE[a.captured]:0));
+      for(const m of ordered){
+        chess.move({from:m.from,to:m.to,promotion:m.promotion||'q'});
+        const score=minimax(depth-1,-Infinity,Infinity,aiColor,start,budget);
+        chess.undo();
+        if(score>best+1){best=score;bestMoves=[m]}else if(Math.abs(score-best)<=1)bestMoves.push(m);
+        if(performance.now()-start>budget&&bestMoves.length)break;
+      }
+      return bestMoves[Math.floor(Math.random()*bestMoves.length)]||moves[0];
+    }
+    function maybeAIMove(){
+      if(gameMode!=='ai'||chess.isGameOver()||animating||aiThinking||chess.turn()!==aiColor)return;
+      aiThinking=true;updateStatus();
+      setTimeout(()=>{
+        const m=chooseAIMove();
+        if(!m){aiThinking=false;updateStatus();return}
+        aiThinking=false;
+        executeMove(m.from,m.to,m.promotion||'q');
+      },MOBILE?180:120);
+    }
+    function resetForMode(){
+      chess.reset(); selected=null; legal=[]; lastMove=null; pendingPromotion=null; aiThinking=false;
+      renderPieces();refreshMarkers();updateStatus();
+      const wantFlip=gameMode==='ai'&&humanColor==='b';
+      if(wantFlip!==flipped){flipped=wantFlip;const p=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);camera.position.copy(p);camera.lookAt(controls.target)}
+      setTimeout(maybeAIMove,220);
+    }
     let audioCtx=null;
     function tone(freq=440,dur=.08,type='sine',gain=.035,delay=0){
       if(!soundOn)return; audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
@@ -332,8 +431,8 @@
       const p=sqToPos(square);
       for(let i=0;i<(MOBILE?6:12);i++){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.035,0),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9}));m.position.set(p.x+.0,.45,p.z);m.userData.v=new THREE.Vector3((Math.random()-.5)*1.8,Math.random()*1.6+.45,(Math.random()-.5)*1.8);m.userData.life=1;fxGroup.add(m)}
     }
-    function updateStatus(){const t=chess.turn()==='w'?'Trắng':'Đen';turnDot.classList.toggle('black',chess.turn()==='b');let s=`${t} đến lượt`;let h='Chạm một quân để xem nước hợp lệ';if(chess.isCheckmate()){s=`Chiếu hết — ${t} thua`;h='Nhấn Ván mới để chơi lại'}else if(chess.isDraw()){s='Ván cờ hòa';h='Nhấn Ván mới để chơi lại'}else if(chess.inCheck()){s=`${t} đang bị chiếu`;h='Hãy bảo vệ Vua'}statusText.textContent=s;hintText.textContent=h}
-    function selectSquare(sq){const pc=chess.get(sq);if(pc&&pc.color===chess.turn()){selected=sq;legal=chess.moves({square:sq,verbose:true});refreshMarkers();sfxSelect();return true}return false}
+    function updateStatus(){const t=chess.turn()==='w'?'Trắng':'Đen';turnDot.classList.toggle('black',chess.turn()==='b');let s=aiThinking?'Máy đang tính…':`${t} đến lượt`;let h=gameMode==='ai'?(aiThinking?'AI đang chọn nước đi':(chess.turn()===humanColor?'Đến lượt anh':'Đến lượt máy')):'Chạm một quân để xem nước hợp lệ';if(chess.isCheckmate()){s=`Chiếu hết — ${t} thua`;h='Nhấn Ván mới để chơi lại'}else if(chess.isDraw()){s='Ván cờ hòa';h='Nhấn Ván mới để chơi lại'}else if(chess.inCheck()){s=`${t} đang bị chiếu`;h='Hãy bảo vệ Vua'}statusText.textContent=s;hintText.textContent=h}
+    function selectSquare(sq){if(aiThinking||(gameMode==='ai'&&chess.turn()!==humanColor))return false;const pc=chess.get(sq);if(pc&&pc.color===chess.turn()){selected=sq;legal=chess.moves({square:sq,verbose:true});refreshMarkers();sfxSelect();return true}return false}
     function needsPromotion(move){return move?.piece==='p'&&(move.to.endsWith('8')||move.to.endsWith('1'))}
     function executeMove(from,to,prom='q'){
       if(animating)return false; let m; try{m=chess.move({from,to,promotion:prom})}catch{return false} if(!m)return false;
@@ -345,26 +444,43 @@
       function step(now){
         const t=Math.min(1,(now-begun)/duration),e=ease(t);
         if(mover&&start){mover.position.x=THREE.MathUtils.lerp(start.x,target.x,e);mover.position.z=THREE.MathUtils.lerp(start.z,target.z,e);mover.position.y=.08+Math.sin(Math.PI*t)*(captured?.62:.44);mover.rotation.y=Math.sin(Math.PI*t)*(captured?.2:.09);const sc=1+Math.sin(Math.PI*t)*.035;mover.scale.setScalar(.94*sc)}
-        if(t<1){requestAnimationFrame(step)}else{animating=false;renderPieces();refreshMarkers();updateStatus()}
+        if(t<1){requestAnimationFrame(step)}else{animating=false;renderPieces();refreshMarkers();updateStatus();setTimeout(maybeAIMove,80)}
       } requestAnimationFrame(step); return true
     }
-    function onSquare(sq){if(animating||chess.isGameOver())return;if(!selected){selectSquare(sq);return}const mv=legal.find(m=>m.to===sq);if(mv){if(needsPromotion(mv)){pendingPromotion={from:selected,to:sq};promotion.classList.add('show');return}executeMove(selected,sq);return}selected=null;legal=[];refreshMarkers();selectSquare(sq)}
+    function onSquare(sq){if(animating||aiThinking||chess.isGameOver()||(gameMode==='ai'&&chess.turn()!==humanColor))return;if(!selected){selectSquare(sq);return}const mv=legal.find(m=>m.to===sq);if(mv){if(needsPromotion(mv)){pendingPromotion={from:selected,to:sq};promotion.classList.add('show');return}executeMove(selected,sq);return}selected=null;legal=[];refreshMarkers();selectSquare(sq)}
 
     const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down={x:0,y:0};let pointer={x:-2,y:-2};
     renderer.domElement.addEventListener('pointermove',e=>{const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1});
     renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}; if(audioCtx?.state==='suspended')audioCtx.resume()});
     renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8)return;const rect=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects(pickables,false)[0];if(hit?.object?.userData?.square)onSquare(hit.object.userData.square)});
     document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(pendingPromotion)executeMove(pendingPromotion.from,pendingPromotion.to,b.dataset.p);pendingPromotion=null;promotion.classList.remove('show')});
+    document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=()=>{
+      gameMode=btn.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b===btn));
+      aiSettings.classList.toggle('hidden',gameMode!=='ai');
+    });
+    document.getElementById('startGame').onclick=()=>{
+      aiLevel=document.getElementById('aiLevel').value;
+      let side=document.getElementById('humanSide').value;
+      if(side==='random')side=Math.random()<.5?'w':'b';
+      humanColor=side;aiColor=humanColor==='w'?'b':'w';
+      localStorage.setItem('royalChessMode',gameMode);
+      localStorage.setItem('royalChessAILevel',aiLevel);
+      localStorage.setItem('royalChessHumanColor',humanColor);
+      modeOverlay.classList.remove('show');modeBtn.textContent=gameMode==='ai'?'AI':'2P';
+      resetForMode();showToast(gameMode==='ai'?'Đấu máy · '+(aiLevel==='easy'?'Dễ':aiLevel==='hard'?'Khó':'Vừa'):'Chế độ hai người');
+    };
+    modeBtn.onclick=()=>{modeOverlay.classList.add('show')};
     document.getElementById('sound').onclick=()=>{soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♪':'×';showToast(soundOn?'Đã bật âm thanh':'Đã tắt âm thanh')};
-    document.getElementById('reset').onclick=()=>{chess.reset();selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();
+    document.getElementById('reset').onclick=()=>{resetForMode();
     {
       const finalPos=new THREE.Vector3(8.8,10.5,10.8),startPos=new THREE.Vector3(0,15.5,17.5),started=performance.now();camera.position.copy(startPos);
       function intro(now){const t=Math.min(1,(now-started)/1150),e=1-Math.pow(1-t,3);camera.position.lerpVectors(startPos,finalPos,e);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(intro)}requestAnimationFrame(intro)
     }showToast('Đã tạo ván mới')};
-    document.getElementById('undo').onclick=()=>{const m=chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã hoàn tác')}};
+    document.getElementById('undo').onclick=()=>{if(animating||aiThinking)return;let m=chess.undo();if(m&&gameMode==='ai'&&chess.turn()!==humanColor)chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã hoàn tác')}};
     document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
-    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.15:1.6))});
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2))});
     renderPieces();refreshMarkers();updateStatus();
     loadHDSet();
     const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);controls.update();const t=clock.getElapsedTime();rim.intensity=20+Math.sin(t*.7)*1.7;fill.intensity=17+Math.sin(t*.53+1)*1.2;halo.material.opacity=.22+Math.sin(t*.8)*.05;world.position.y=MOBILE?0:Math.sin(t*.55)*.012;
