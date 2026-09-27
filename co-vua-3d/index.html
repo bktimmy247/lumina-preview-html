@@ -120,103 +120,66 @@
     }
     function makePiece(type,color,square){
       const mat=color==='w'?whiteMat:blackMat;
-      const inset=color==='w'?insetWhite:insetBlack;
-      const crystal=color==='w'?crystalWhite:crystalBlack;
-      const accent=color==='w'?goldMat:new THREE.MeshStandardMaterial({color:0x496b9c,roughness:.18,metalness:.9});
-      const g=new THREE.Group(); g.userData={kind:'piece',square,color,type};
+      const accent=goldMat;
+      const g=new THREE.Group();
+      g.userData={kind:'piece',square,color,type};
 
-      // Common sculpted pedestal, deliberately smaller so the upper body reads as a character.
-      const pedestal=new THREE.Group();
-      pedestal.add(part(geo.cyl(.36,.46,.10,36),mat,.05));
-      pedestal.add(part(geo.cyl(.28,.36,.08,36),accent,.14));
-      pedestal.add(part(geo.cyl(.25,.30,.08,36),mat,.22));
-      g.add(pedestal);
-
-      const torso=(scale=1)=>{
-        const t=part(geo.cyl(.17*scale,.24*scale,.34,24),mat,.55);
-        const chest=part(geo.box(.38*scale,.22,.16),accent,.72); chest.position.z=.05;
-        g.add(t,chest);
-        for(const side of [-1,1]){const shoulder=part(new THREE.SphereGeometry(.12*scale,18,12),accent,.72);shoulder.position.x=.22*side*scale;shoulder.scale.set(1.25,.75,1);g.add(shoulder)}
-      };
-      const head=(helmet=true,y=.94)=>{
-        const h=part(geo.sphere(.14,24,16),inset,y);h.scale.set(1,.92,.94);g.add(h);
-        if(helmet){const cap=part(geo.sphere(.165,24,12),mat,y+.05);cap.scale.set(1,.58,1);g.add(cap)}
-        return h;
-      };
-      const arm=(side,weapon=false,y=.68)=>{
-        const a=part(geo.cyl(.055,.065,.34,16),mat,y);a.rotation.z=side*.42;a.position.x=.23*side;g.add(a);
-        if(weapon){const blade=part(geo.box(.045,.48,.05),accent,y+.05);blade.position.x=.34*side;blade.rotation.z=side*.12;g.add(blade)}
-      };
-      const cape=(width=.34,y=.63)=>{
-        const c=part(geo.cone(width,.55,28),mat,y);c.rotation.x=Math.PI;c.position.z=-.13;c.scale.z=.35;g.add(c)
-      };
+      // Classic Staunton-inspired base.
+      g.add(baseBody(mat));
 
       if(type==='p'){
-        // Royal Guard / Shadow Guard.
-        torso(.86); head(true,.93); arm(-1,false,.66); arm(1,true,.66);
-        const visor=part(geo.box(.24,.045,.14),accent,1.01);visor.position.z=.10;g.add(visor);
-        const crest=part(geo.cone(.045,.24,12),crystal,1.20);crest.rotation.z=.08;g.add(crest);
+        g.add(part(geo.lathe([[.22,0],[.25,.10],[.20,.25],[.15,.40],[.18,.48]]),mat,.31));
+        g.add(part(geo.sphere(.19),mat,.91));
       }
 
       if(type==='r'){
-        // Living fortress: chunky armored sentinel rather than a chess rook.
-        torso(1.15);
-        const helm=part(geo.cyl(.26,.30,.30,8),mat,1.02);helm.rotation.y=Math.PI/8;g.add(helm);
-        const slit=part(geo.box(.28,.055,.05),crystal,1.04);slit.position.z=.27;g.add(slit);
-        for(const side of [-1,1]){const shield=part(geo.box(.16,.52,.28),mat,.68);shield.position.x=.32*side;shield.rotation.z=side*.08;g.add(shield)}
-        for(const side of [-1,1]){const horn=part(geo.cone(.07,.30,12),accent,1.31);horn.position.x=.18*side;horn.rotation.z=side*.24;g.add(horn)}
+        g.add(part(geo.lathe([[.26,0],[.29,.11],[.25,.48],[.31,.58]]),mat,.31));
+        g.add(part(geo.cyl(.34,.34,.18),mat,.94));
+        g.add(part(geo.torus(.30,.028),accent,1.00,Math.PI/2));
+        for(const [x,z] of [[.21,.21],[-.21,.21],[.21,-.21],[-.21,-.21]]){
+          const c=part(geo.box(.14,.20,.14),mat,1.10); c.position.x=x; c.position.z=z; g.add(c);
+        }
       }
 
       if(type==='n'){
-        // Full warhorse bust.
-        const neck=part(geo.box(.34,.62,.34),mat,.65);neck.rotation.z=-.20;neck.position.x=.05;g.add(neck);
-        const horse=part(geo.sphere(.24,24,16),inset,1.05);horse.scale.set(1.45,.82,.90);horse.position.x=.17;g.add(horse);
-        const muzzle=part(geo.box(.34,.16,.22),mat,1.02);muzzle.position.x=.42;g.add(muzzle);
-        const barding=part(geo.box(.38,.23,.30),accent,.88);barding.position.x=.05;g.add(barding);
-        for(const z of [-.11,.11]){const ear=part(geo.cone(.055,.20,12),mat,1.29);ear.position.set(.06,1.29,z);g.add(ear)}
-        const mane=part(geo.box(.08,.48,.18),crystal,.98);mane.position.x=-.10;g.add(mane);
+        g.add(part(geo.lathe([[.24,0],[.28,.11],[.22,.31],[.19,.43]]),mat,.31));
+        const neck=part(geo.box(.28,.58,.30),mat,.78,0,-.22); neck.position.x=.08; g.add(neck);
+        const head=part(geo.sphere(.25),mat,1.08); head.scale.set(1.20,.82,.84); head.position.x=.17; g.add(head);
+        const muzzle=part(geo.box(.27,.16,.20),mat,1.06,0,-.04); muzzle.position.x=.38; g.add(muzzle);
+        for(const z of [-.085,.085]){const ear=part(geo.cone(.06,.18),mat,1.31);ear.position.set(.05,1.31,z);g.add(ear)}
       }
 
       if(type==='b'){
-        // Hooded battle priest with staff.
-        torso(.95); cape(.34,.64); head(false,.96);
-        const hood=part(geo.cone(.21,.34,24),mat,1.17);hood.scale.z=.82;g.add(hood);
-        const mask=part(geo.box(.16,.08,.035),crystal,.99);mask.position.z=.135;g.add(mask);
-        const staff=part(geo.cyl(.025,.025,.88,14),accent,.79);staff.position.x=.30;staff.rotation.z=-.04;g.add(staff);
-        const relic=jewel(crystal,1.28,1.1);relic.position.x=.30;g.add(relic);
-        arm(-1,false,.66);
+        g.add(part(geo.lathe([[.23,0],[.28,.11],[.22,.36],[.17,.57],[.22,.64]]),mat,.31));
+        const head=part(geo.sphere(.25),mat,1.00); head.scale.y=1.12; g.add(head);
+        const tip=part(geo.cone(.11,.30),accent,1.32); tip.rotation.z=.18; g.add(tip);
       }
 
       if(type==='q'){
-        // Arcane queen: humanoid torso, broad mantle, high crown and wing-like shoulder blades.
-        torso(1.0); cape(.40,.67); head(false,1.03);
-        for(const side of [-1,1]){const wing=part(geo.box(.08,.52,.22),accent,.82);wing.position.x=.34*side;wing.rotation.z=side*.35;g.add(wing)}
-        const crownBand=part(geo.cyl(.18,.20,.08,28),accent,1.18);g.add(crownBand);
-        for(let i=0;i<5;i++){const a=(i-2)*.22,c=part(geo.cone(.055,.30,12),accent,1.37);c.position.x=a;c.rotation.z=a*.7;g.add(c)}
-        const gem=jewel(crystal,1.46,1.5);g.add(gem);
-        arm(-1,false,.72); arm(1,true,.72);
+        g.add(part(geo.lathe([[.24,0],[.30,.12],[.23,.41],[.18,.64],[.24,.71]]),mat,.31));
+        g.add(part(geo.sphere(.21),mat,1.02));
+        g.add(part(geo.torus(.26,.040),accent,1.16,Math.PI/2));
+        for(let i=0;i<6;i++){
+          const a=i*Math.PI/3,c=part(geo.sphere(.050),accent,1.28);
+          c.position.x=Math.cos(a)*.22;c.position.z=Math.sin(a)*.22;g.add(c);
+        }
       }
 
       if(type==='k'){
-        // High King / Dread King: tallest and unmistakably humanoid.
-        torso(1.08); cape(.44,.69); head(false,1.05);
-        const crown=part(geo.cyl(.19,.22,.09,28),accent,1.21);g.add(crown);
-        for(let i=0;i<6;i++){const a=i*Math.PI/3,sp=part(geo.cone(.055,.28,12),accent,1.39);sp.position.x=Math.cos(a)*.16;sp.position.z=Math.sin(a)*.16;g.add(sp)}
-        const core=jewel(crystal,1.49,1.35);g.add(core);
-        arm(-1,false,.73);
-        const sword=part(geo.box(.055,.62,.055),accent,.88);sword.position.x=.34;sword.rotation.z=-.12;g.add(sword);
-        const guard=part(geo.box(.24,.05,.06),accent,.63);guard.position.x=.31;guard.rotation.z=-.12;g.add(guard);
+        g.add(part(geo.lathe([[.24,0],[.30,.12],[.23,.43],[.18,.66],[.24,.74]]),mat,.31));
+        g.add(part(geo.sphere(.21),mat,1.05));
+        g.add(part(geo.torus(.24,.035),accent,1.17,Math.PI/2));
+        const v=part(geo.box(.10,.36,.10),accent,1.40);
+        const h=part(geo.box(.31,.09,.10),accent,1.46);
+        g.add(v,h);
       }
 
-      // Cheap faction glow: emissive mesh instead of a real light per piece.
-      const glow=part(new THREE.SphereGeometry(type==='k'||type==='q'?.085:.055,MOBILE?10:16,MOBILE?6:10),crystal,.58);
-      glow.userData.noPick=true; g.add(glow);
-
-      const p=sqToPos(square);g.position.set(p.x,.08,p.z);
-      const scale=type==='k'?1.02:type==='q'?1.0:type==='r'?.96:.93;
-      g.scale.setScalar(scale);
-      if(color==='b')g.rotation.y=Math.PI;
-      g.traverse(o=>{if(o.isMesh&&!o.userData.noPick){o.userData=g.userData;pickables.push(o)}});return g;
+      const p=sqToPos(square);
+      g.position.set(p.x,.08,p.z);
+      g.scale.setScalar(.94);
+      if(type==='n'&&color==='b')g.rotation.y=Math.PI;
+      g.traverse(o=>{if(o.isMesh){o.userData=g.userData;pickables.push(o)}});
+      return g;
     }
 
     const chess=new Chess(); let selected=null; let legal=[]; let lastMove=null; let pendingPromotion=null; let flipped=false; let animating=false; let soundOn=true; let hoveredPiece=null;
