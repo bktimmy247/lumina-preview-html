@@ -39,7 +39,7 @@
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD02-LIVE</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD03-BW</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
     <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
@@ -77,7 +77,7 @@
     const MOBILE=innerWidth<700 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); const REDUCED=MOBILE || (navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4);
     const canvas=document.getElementById('game');
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
-    renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.32;
+    renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.40;
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0x070b12); scene.fog=new THREE.FogExp2(0x070b12,.036);
     const camera=new THREE.PerspectiveCamera(innerWidth<640?38:42,innerWidth/innerHeight,.1,80); camera.position.set(innerWidth<640?7.6:8.8,innerWidth<640?9.2:10.5,innerWidth<640?9.4:10.8);
     const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.065; controls.target.set(0,.25,0); controls.minDistance=8.5; controls.maxDistance=21; controls.maxPolarAngle=Math.PI*.47; controls.minPolarAngle=.28;
@@ -86,7 +86,7 @@
     const fill=new THREE.PointLight(0xffd1a1,12,26,2); fill.position.set(6,4,-6); scene.add(fill);
     const rim=new THREE.PointLight(0xaecfff,12,26,2); rim.position.set(-7,6,-5); scene.add(rim);
     const crownLight=new THREE.SpotLight(0xffd38b,34,30,Math.PI*.22,.55,1.5); crownLight.position.set(0,13,2); crownLight.target.position.set(0,0,0); scene.add(crownLight,crownLight.target);
-    const frontFill=new THREE.DirectionalLight(0xfff4df,MOBILE?1.55:1.35); frontFill.position.set(0,7,10); frontFill.castShadow=false; scene.add(frontFill);
+    const frontFill=new THREE.DirectionalLight(0xffffff,MOBILE?1.85:1.55); frontFill.position.set(0,7,10); frontFill.castShadow=false; scene.add(frontFill);
 
     const world=new THREE.Group(); scene.add(world);
     const boardGroup=new THREE.Group(); world.add(boardGroup);
@@ -101,7 +101,7 @@
     const lip=new THREE.Mesh(new THREE.BoxGeometry(8.86,.18,8.86),brassMat); lip.position.y=-.055; lip.castShadow=true; boardGroup.add(lip);
     const innerFrame=new THREE.Mesh(new THREE.BoxGeometry(8.32,.10,8.32),new THREE.MeshStandardMaterial({color:0x1c2029,roughness:.3,metalness:.66})); innerFrame.position.y=.005; boardGroup.add(innerFrame);
     for(const [x,z] of [[-4.45,-4.45],[-4.45,4.45],[4.45,-4.45],[4.45,4.45]]){const stud=new THREE.Mesh(new THREE.CylinderGeometry(.13,.16,.08,32),brassMat);stud.position.set(x,-.02,z);stud.castShadow=true;boardGroup.add(stud)}
-    const lightMat=new THREE.MeshPhysicalMaterial({color:0xe9dfc9,roughness:.40,metalness:.02,clearcoat:.38,clearcoatRoughness:.32}); const darkMat=new THREE.MeshPhysicalMaterial({color:0x4a535d,roughness:.44,metalness:.05,clearcoat:.30,clearcoatRoughness:.38});
+    const lightMat=new THREE.MeshPhysicalMaterial({color:0xdedede,roughness:.42,metalness:.02,clearcoat:.32,clearcoatRoughness:.34}); const darkMat=new THREE.MeshPhysicalMaterial({color:0x3a3f46,roughness:.46,metalness:.04,clearcoat:.28,clearcoatRoughness:.40});
     const selMat=new THREE.MeshBasicMaterial({color:0xffcf62,transparent:true,opacity:.58,depthWrite:false}); const moveMat=new THREE.MeshBasicMaterial({color:0x63d7ff,transparent:true,opacity:.55,depthWrite:false}); const capMat=new THREE.MeshBasicMaterial({color:0xff6c79,transparent:true,opacity:.52,depthWrite:false});
     function sqToPos(s){const f=s.charCodeAt(0)-97, r=Number(s[1])-1;return new THREE.Vector3(f-3.5,.065,3.5-r)}
     function posToSq(f,r){return String.fromCharCode(97+f)+(r+1)}
@@ -117,8 +117,8 @@
     const archMat=new THREE.MeshBasicMaterial({color:0x274e70,transparent:true,opacity:.08,side:THREE.DoubleSide});
     for(let i=0;i<(MOBILE?1:3);i++){const a=new THREE.Mesh(new THREE.TorusGeometry(10+i*1.4,.045,MOBILE?5:8,MOBILE?40:96,Math.PI),archMat);a.rotation.z=Math.PI/2;a.position.y=3+i*.5;scene.add(a)}
 
-    const whiteMat=new THREE.MeshPhysicalMaterial({color:0xe3c386,roughness:.22,metalness:.01,clearcoat:.95,clearcoatRoughness:.08});
-    const blackMat=new THREE.MeshPhysicalMaterial({color:0x7a4630,roughness:.24,metalness:.01,clearcoat:.95,clearcoatRoughness:.08});
+    const whiteMat=new THREE.MeshPhysicalMaterial({color:0xf2f2ee,roughness:.18,metalness:.0,clearcoat:.95,clearcoatRoughness:.06});
+    const blackMat=new THREE.MeshPhysicalMaterial({color:0x111111,roughness:.20,metalness:.0,clearcoat:.95,clearcoatRoughness:.06});
     const goldMat=new THREE.MeshStandardMaterial({color:0xb98a50,roughness:.38,metalness:.06});
     const insetWhite=new THREE.MeshStandardMaterial({color:0xfff7e6,roughness:.2,metalness:.15,emissive:0x2c2416,emissiveIntensity:.15});
     const insetBlack=new THREE.MeshStandardMaterial({color:0x28384f,roughness:.18,metalness:.62,emissive:0x071424,emissiveIntensity:.35});
