@@ -39,7 +39,7 @@
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD03-BW</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD04-SFX</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
     <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
@@ -413,14 +413,60 @@
       setTimeout(maybeAIMove,220);
     }
     let audioCtx=null;
-    function tone(freq=440,dur=.08,type='sine',gain=.035,delay=0){
-      if(!soundOn)return; audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
-      const t=audioCtx.currentTime+delay,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(gain,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+dur+.02)
+    const sfxRand=(a,b)=>a+Math.random()*(b-a);
+    function ensureAudio(){
+      if(!soundOn)return null;
+      audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended')audioCtx.resume();
+      return audioCtx;
     }
-    function sfxSelect(){tone(720,.055,'sine',.025)}
-    function sfxMove(){tone(240,.07,'triangle',.035);tone(360,.09,'sine',.02,.04)}
-    function sfxCapture(){tone(135,.12,'sawtooth',.035);tone(90,.16,'triangle',.03,.03)}
-    function sfxCheck(){tone(520,.08,'square',.024);tone(760,.12,'sine',.024,.07)}
+    function tone(freq=440,dur=.08,type='sine',gain=.035,delay=0,detune=0){
+      const ctx=ensureAudio();if(!ctx)return;
+      const t=ctx.currentTime+delay,o=ctx.createOscillator(),g=ctx.createGain();
+      o.type=type;o.frequency.setValueAtTime(freq,t);o.detune.setValueAtTime(detune,t);
+      g.gain.setValueAtTime(.0001,t);
+      g.gain.exponentialRampToValueAtTime(Math.max(.0002,gain),t+.006);
+      g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+      o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+dur+.025)
+    }
+    function noiseBurst(dur=.045,gain=.018,cutoff=1100,delay=0){
+      const ctx=ensureAudio();if(!ctx)return;
+      const frames=Math.max(1,Math.floor(ctx.sampleRate*dur));
+      const buffer=ctx.createBuffer(1,frames,ctx.sampleRate),data=buffer.getChannelData(0);
+      for(let i=0;i<frames;i++){const env=1-i/frames;data[i]=(Math.random()*2-1)*env}
+      const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),g=ctx.createGain(),t=ctx.currentTime+delay;
+      src.buffer=buffer;filter.type='bandpass';filter.frequency.value=cutoff;filter.Q.value=.75;
+      g.gain.setValueAtTime(gain*sfxRand(.95,1.05),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+      src.connect(filter);filter.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+dur+.02)
+    }
+    function woodHit(freq=175,gain=.055,delay=0){
+      const pitch=sfxRand(.97,1.03);
+      tone(freq*pitch,.07,'triangle',gain*sfxRand(.95,1.05),delay);
+      tone(freq*1.82*pitch,.035,'sine',gain*.27,delay+.004);
+      noiseBurst(.04,gain*.36,920*sfxRand(.94,1.06),delay);
+    }
+    function sfxSelect(){
+      tone(690*sfxRand(.98,1.02),.038,'sine',.018*sfxRand(.95,1.05));
+      noiseBurst(.025,.008,1750);
+    }
+    function sfxMove(){woodHit(178,.060)}
+    function sfxCapture(){woodHit(150,.072);woodHit(104,.055,.052)}
+    function sfxCheck(){
+      woodHit(165,.045);
+      tone(784,.18,'sine',.029,.055,sfxRand(-5,5));
+      tone(1175,.24,'sine',.020,.115,sfxRand(-4,4));
+    }
+    function sfxCheckmate(){
+      woodHit(142,.064);
+      tone(523.25,.22,'sine',.026,.07);
+      tone(659.25,.26,'sine',.024,.17);
+      tone(783.99,.34,'sine',.025,.29);
+    }
+    function sfxUndo(){
+      tone(410,.055,'triangle',.020,0);
+      tone(300,.075,'triangle',.023,.045);
+      noiseBurst(.035,.007,760,.02);
+    }
     const statusText=document.getElementById('statusText'), hintText=document.getElementById('hintText'), turnDot=document.getElementById('turnDot'), markerRoot=markerGroup, promotion=document.getElementById('promotion'), toast=document.getElementById('toast');
     function clearPieces(){for(let i=pieceGroup.children.length-1;i>=0;i--)pieceGroup.remove(pieceGroup.children[i]);for(let i=pickables.length-1;i>=0;i--){if(pickables[i].userData?.kind==='piece')pickables.splice(i,1)}}
     function renderPieces(){clearPieces();const b=chess.board();for(let r=0;r<8;r++)for(let f=0;f<8;f++){const pc=b[r][f];if(!pc)continue;const sq=String.fromCharCode(97+f)+(8-r);pieceGroup.add(makePiece(pc.type,pc.color,sq))}}
@@ -437,7 +483,7 @@
     function executeMove(from,to,prom='q'){
       if(animating)return false; let m; try{m=chess.move({from,to,promotion:prom})}catch{return false} if(!m)return false;
       const captured=!!m.captured; lastMove={from:m.from,to:m.to}; selected=null; legal=[]; refreshMarkers(); updateStatus();
-      if(captured){burstAt(to,0xff7d87);sfxCapture()}else sfxMove(); if(chess.inCheck())setTimeout(sfxCheck,100);
+      if(captured){burstAt(to,0xff7d87);sfxCapture()}else sfxMove(); if(chess.isCheckmate())setTimeout(sfxCheckmate,110);else if(chess.inCheck())setTimeout(sfxCheck,100);
       const mover=pieceGroup.children.find(g=>g.userData?.square===from), target=sqToPos(to), start=mover?.position.clone(); animating=true;
       const duration=captured?340:300, begun=performance.now();
       function ease(x){return 1-Math.pow(1-x,3)}
@@ -471,13 +517,13 @@
       resetForMode();showToast(gameMode==='ai'?'Đấu máy · '+(aiLevel==='easy'?'Dễ':aiLevel==='hard'?'Khó':'Vừa'):'Chế độ hai người');
     };
     modeBtn.onclick=()=>{modeOverlay.classList.add('show')};
-    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♪':'×';showToast(soundOn?'Đã bật âm thanh':'Đã tắt âm thanh')};
+    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;if(soundOn)ensureAudio();document.getElementById('sound').textContent=soundOn?'♪':'×';showToast(soundOn?'Đã bật SFX':'Đã tắt SFX')};
     document.getElementById('reset').onclick=()=>{resetForMode();
     {
       const finalPos=new THREE.Vector3(8.8,10.5,10.8),startPos=new THREE.Vector3(0,15.5,17.5),started=performance.now();camera.position.copy(startPos);
       function intro(now){const t=Math.min(1,(now-started)/1150),e=1-Math.pow(1-t,3);camera.position.lerpVectors(startPos,finalPos,e);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(intro)}requestAnimationFrame(intro)
     }showToast('Đã tạo ván mới')};
-    document.getElementById('undo').onclick=()=>{if(animating||aiThinking)return;let m=chess.undo();if(m&&gameMode==='ai'&&chess.turn()!==humanColor)chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();showToast('Đã hoàn tác')}};
+    document.getElementById('undo').onclick=()=>{if(animating||aiThinking)return;let m=chess.undo();if(m&&gameMode==='ai'&&chess.turn()!==humanColor)chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();sfxUndo();showToast('Đã hoàn tác')}};
     document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2))});
