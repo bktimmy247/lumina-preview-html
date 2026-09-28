@@ -39,7 +39,7 @@
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD05-MUSIC</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD06-AUDIOFIX</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
     <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="music" class="icon-btn" aria-label="Nhạc nền" title="Nhạc nền">♫</button><button id="sound" class="icon-btn" aria-label="Hiệu ứng âm thanh" title="SFX">🔊</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
@@ -413,78 +413,131 @@
       setTimeout(maybeAIMove,220);
     }
     const MUSIC_URL='https://cdn1.suno.ai/7f1b9f01-13ef-42cf-b614-1603487535cd.mp3';
-    const MUSIC_VOLUME=.24;
-    const bgMusic=new Audio(MUSIC_URL);
-    bgMusic.loop=true;bgMusic.preload='auto';bgMusic.volume=MUSIC_VOLUME;bgMusic.playsInline=true;
-    let musicOn=true,musicStarted=false,musicDuckTimer=null;
+    const MUSIC_VOLUME=.22;
+    let musicOn=true,musicStarted=false,musicDuckTimer=null,audioUnlocked=false,useFallbackMusic=false;
+    let sfxChannelIndex=0;
+
+    function wavUrl(duration, sampleRate, renderSample){
+      const count=Math.max(1,Math.floor(duration*sampleRate));
+      const buffer=new ArrayBuffer(44+count*2),view=new DataView(buffer);
+      const write=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i))};
+      write(0,'RIFF');view.setUint32(4,36+count*2,true);write(8,'WAVE');write(12,'fmt ');
+      view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+      view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
+      view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,count*2,true);
+      for(let i=0;i<count;i++){
+        const v=Math.max(-1,Math.min(1,renderSample(i/sampleRate,i,count)));
+        view.setInt16(44+i*2,Math.round(v*32767),true);
+      }
+      return URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));
+    }
+    function woodSample(t,hit=0,freq=175,gain=.8){
+      const x=t-hit;if(x<0||x>.18)return 0;
+      const env=Math.exp(-x*32);
+      const body=Math.sin(2*Math.PI*freq*x)*.58+Math.sin(2*Math.PI*freq*1.83*x)*.18;
+      const knock=(Math.random()*2-1)*Math.exp(-x*85)*.34;
+      return (body+knock)*env*gain;
+    }
+    function chimeSample(t,start,freq,gain=.4,decay=5){
+      const x=t-start;if(x<0)return 0;
+      const e=Math.exp(-x*decay);
+      return (Math.sin(2*Math.PI*freq*x)+.27*Math.sin(2*Math.PI*freq*2.01*x))*e*gain;
+    }
+    const silentUrl=wavUrl(.08,8000,()=>0);
+    const sfxUrls={
+      select:wavUrl(.10,22050,(t)=>chimeSample(t,0,690,.20,28)+woodSample(t,0,310,.18)),
+      move:wavUrl(.20,22050,(t)=>woodSample(t,0,178,.72)),
+      capture:wavUrl(.30,22050,(t)=>woodSample(t,0,150,.78)+woodSample(t,.055,104,.62)),
+      check:wavUrl(.48,22050,(t)=>woodSample(t,0,165,.48)+chimeSample(t,.055,784,.33,7)+chimeSample(t,.115,1175,.22,8)),
+      mate:wavUrl(.92,22050,(t)=>woodSample(t,0,142,.58)+chimeSample(t,.07,523.25,.27,4.7)+chimeSample(t,.17,659.25,.25,4.8)+chimeSample(t,.29,783.99,.27,4.3)),
+      undo:wavUrl(.24,22050,(t)=>chimeSample(t,0,410,.22,20)+chimeSample(t,.045,300,.24,16)+woodSample(t,.02,120,.18))
+    };
+    const sfxChannels=Array.from({length:4},()=>{const a=new Audio(silentUrl);a.preload='auto';a.playsInline=true;return a});
+    const bgMusic=new Audio(silentUrl);
+    bgMusic.loop=true;bgMusic.preload='auto';bgMusic.playsInline=true;bgMusic.volume=MUSIC_VOLUME;
+
+    // Built-in calm piano fallback. This is intentionally HTMLAudio, not WebAudio,
+    // so iPhone silent-mode/WebKit quirks do not mute the game completely.
+    const ambientNotes=[
+      [261.63,329.63,392.00],[220.00,261.63,329.63],[174.61,220.00,261.63],[196.00,246.94,293.66],
+      [261.63,329.63,392.00],[233.08,293.66,349.23],[196.00,246.94,329.63],[220.00,277.18,329.63]
+    ];
+    const fallbackMusicUrl=wavUrl(24,16000,(t)=>{
+      const beat=3,idx=Math.floor(t/beat)%ambientNotes.length,local=t%beat;
+      const chord=ambientNotes[idx];
+      const env=Math.min(1,local/.24)*Math.exp(-local*.72);
+      let v=0;
+      for(let n=0;n<chord.length;n++){
+        const f=chord[n],phase=t*2*Math.PI*f;
+        v+=(Math.sin(phase)+.18*Math.sin(phase*2.01)+.07*Math.sin(phase*3.02))/(n===0?3.0:3.8);
+      }
+      const high=chord[(idx+1)%3]*2;
+      if(local>1.55){const x=local-1.55;v+=Math.sin(2*Math.PI*high*x)*Math.exp(-x*2.4)*.12}
+      return v*env*.26;
+    });
+
+    async function unlockAudioSystem(){
+      if(audioUnlocked)return true;
+      try{
+        for(const a of sfxChannels){
+          a.src=silentUrl;a.volume=.001;a.currentTime=0;
+          await a.play();a.pause();a.currentTime=0;a.volume=1;
+        }
+        bgMusic.src=silentUrl;bgMusic.volume=.001;bgMusic.currentTime=0;
+        await bgMusic.play();bgMusic.pause();bgMusic.currentTime=0;bgMusic.volume=MUSIC_VOLUME;
+        audioUnlocked=true;
+        if(musicOn)ensureMusic();
+        return true;
+      }catch(err){
+        console.warn('Audio unlock failed',err);
+        return false;
+      }
+    }
+    function playSfx(name,volume=1,rate=1){
+      if(!soundOn)return;
+      const a=sfxChannels[sfxChannelIndex++%sfxChannels.length];
+      try{
+        a.pause();a.src=sfxUrls[name];a.currentTime=0;a.volume=Math.max(0,Math.min(1,volume));a.playbackRate=rate;
+        const p=a.play();if(p?.catch)p.catch(err=>console.warn('SFX play failed',name,err));
+      }catch(err){console.warn('SFX failed',name,err)}
+    }
+    function switchToFallbackMusic(reason){
+      if(useFallbackMusic)return;
+      useFallbackMusic=true;
+      console.warn('Using built-in music fallback',reason||'remote unavailable');
+      bgMusic.pause();bgMusic.src=fallbackMusicUrl;bgMusic.loop=true;bgMusic.volume=MUSIC_VOLUME;
+      if(musicOn){
+        const p=bgMusic.play();
+        if(p?.then)p.then(()=>{musicStarted=true}).catch(err=>console.warn('Fallback music play failed',err));
+      }
+      if(typeof showToast==='function')showToast('Nhạc nền dự phòng đã bật');
+    }
     async function ensureMusic(){
       if(!musicOn)return;
-      try{await bgMusic.play();musicStarted=true}catch(err){console.debug('Music waits for user gesture',err)}
+      if(!audioUnlocked){await unlockAudioSystem();if(!audioUnlocked)return}
+      try{
+        if(!musicStarted&&!useFallbackMusic){
+          bgMusic.src=MUSIC_URL;bgMusic.loop=true;bgMusic.volume=MUSIC_VOLUME;
+        }
+        await bgMusic.play();musicStarted=true;
+        if(!useFallbackMusic){
+          setTimeout(()=>{if(musicOn&&(bgMusic.paused||bgMusic.readyState<2))switchToFallbackMusic('remote timeout')},1800);
+        }
+      }catch(err){switchToFallbackMusic(err?.name||'remote play rejected')}
     }
-    function duckMusic(ms=260,level=.15){
+    bgMusic.addEventListener('error',()=>{if(!useFallbackMusic)switchToFallbackMusic('remote media error')});
+    function duckMusic(ms=260,level=.14){
       if(!musicOn||bgMusic.paused)return;
       clearTimeout(musicDuckTimer);bgMusic.volume=level;
       musicDuckTimer=setTimeout(()=>{if(musicOn)bgMusic.volume=MUSIC_VOLUME},ms);
     }
-    bgMusic.addEventListener('error',()=>console.warn('Background music failed to load',MUSIC_URL));
 
-    let audioCtx=null;
-    const sfxRand=(a,b)=>a+Math.random()*(b-a);
-    function ensureAudio(){
-      if(!soundOn)return null;
-      audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended')audioCtx.resume();
-      return audioCtx;
-    }
-    function tone(freq=440,dur=.08,type='sine',gain=.035,delay=0,detune=0){
-      const ctx=ensureAudio();if(!ctx)return;
-      const t=ctx.currentTime+delay,o=ctx.createOscillator(),g=ctx.createGain();
-      o.type=type;o.frequency.setValueAtTime(freq,t);o.detune.setValueAtTime(detune,t);
-      g.gain.setValueAtTime(.0001,t);
-      g.gain.exponentialRampToValueAtTime(Math.max(.0002,gain),t+.006);
-      g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-      o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+dur+.025)
-    }
-    function noiseBurst(dur=.045,gain=.018,cutoff=1100,delay=0){
-      const ctx=ensureAudio();if(!ctx)return;
-      const frames=Math.max(1,Math.floor(ctx.sampleRate*dur));
-      const buffer=ctx.createBuffer(1,frames,ctx.sampleRate),data=buffer.getChannelData(0);
-      for(let i=0;i<frames;i++){const env=1-i/frames;data[i]=(Math.random()*2-1)*env}
-      const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),g=ctx.createGain(),t=ctx.currentTime+delay;
-      src.buffer=buffer;filter.type='bandpass';filter.frequency.value=cutoff;filter.Q.value=.75;
-      g.gain.setValueAtTime(gain*sfxRand(.95,1.05),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-      src.connect(filter);filter.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+dur+.02)
-    }
-    function woodHit(freq=175,gain=.055,delay=0){
-      const pitch=sfxRand(.97,1.03);
-      tone(freq*pitch,.07,'triangle',gain*sfxRand(.95,1.05),delay);
-      tone(freq*1.82*pitch,.035,'sine',gain*.27,delay+.004);
-      noiseBurst(.04,gain*.36,920*sfxRand(.94,1.06),delay);
-    }
-    function sfxSelect(){
-      tone(690*sfxRand(.98,1.02),.038,'sine',.018*sfxRand(.95,1.05));
-      noiseBurst(.025,.008,1750);
-    }
-    function sfxMove(){duckMusic(220,.17);woodHit(178,.060)}
-    function sfxCapture(){duckMusic(330,.13);woodHit(150,.072);woodHit(104,.055,.052)}
-    function sfxCheck(){
-      duckMusic(520,.11);
-      woodHit(165,.045);
-      tone(784,.18,'sine',.029,.055,sfxRand(-5,5));
-      tone(1175,.24,'sine',.020,.115,sfxRand(-4,4));
-    }
-    function sfxCheckmate(){
-      duckMusic(900,.09);
-      woodHit(142,.064);
-      tone(523.25,.22,'sine',.026,.07);
-      tone(659.25,.26,'sine',.024,.17);
-      tone(783.99,.34,'sine',.025,.29);
-    }
-    function sfxUndo(){
-      tone(410,.055,'triangle',.020,0);
-      tone(300,.075,'triangle',.023,.045);
-      noiseBurst(.035,.007,760,.02);
-    }
+    function sfxSelect(){playSfx('select',.52,.98+Math.random()*.04)}
+    function sfxMove(){duckMusic(220,.15);playSfx('move',.78,.97+Math.random()*.06)}
+    function sfxCapture(){duckMusic(340,.11);playSfx('capture',.90,.98+Math.random()*.04)}
+    function sfxCheck(){duckMusic(560,.09);playSfx('check',.82,1)}
+    function sfxCheckmate(){duckMusic(980,.07);playSfx('mate',.88,1)}
+    function sfxUndo(){playSfx('undo',.62,1)}
     const statusText=document.getElementById('statusText'), hintText=document.getElementById('hintText'), turnDot=document.getElementById('turnDot'), markerRoot=markerGroup, promotion=document.getElementById('promotion'), toast=document.getElementById('toast');
     function clearPieces(){for(let i=pieceGroup.children.length-1;i>=0;i--)pieceGroup.remove(pieceGroup.children[i]);for(let i=pickables.length-1;i>=0;i--){if(pickables[i].userData?.kind==='piece')pickables.splice(i,1)}}
     function renderPieces(){clearPieces();const b=chess.board();for(let r=0;r<8;r++)for(let f=0;f<8;f++){const pc=b[r][f];if(!pc)continue;const sq=String.fromCharCode(97+f)+(8-r);pieceGroup.add(makePiece(pc.type,pc.color,sq))}}
@@ -515,7 +568,7 @@
 
     const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down={x:0,y:0};let pointer={x:-2,y:-2};
     renderer.domElement.addEventListener('pointermove',e=>{const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1});
-    renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}; if(audioCtx?.state==='suspended')audioCtx.resume()});
+    renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};unlockAudioSystem()});
     renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8)return;const rect=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects(pickables,false)[0];if(hit?.object?.userData?.square)onSquare(hit.object.userData.square)});
     document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(pendingPromotion)executeMove(pendingPromotion.from,pendingPromotion.to,b.dataset.p);pendingPromotion=null;promotion.classList.remove('show')});
     document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=()=>{
@@ -542,7 +595,7 @@
       if(musicOn){bgMusic.volume=MUSIC_VOLUME;ensureMusic();btn.textContent='♫';showToast('Đã bật nhạc nền')}
       else{bgMusic.pause();btn.textContent='×';showToast('Đã tắt nhạc nền')}
     };
-    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;if(soundOn)ensureAudio();document.getElementById('sound').textContent=soundOn?'🔊':'×';showToast(soundOn?'Đã bật SFX':'Đã tắt SFX')};
+    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;if(soundOn)unlockAudioSystem();document.getElementById('sound').textContent=soundOn?'🔊':'×';showToast(soundOn?'Đã bật SFX':'Đã tắt SFX')};
     document.getElementById('reset').onclick=()=>{resetForMode();
     {
       const finalPos=new THREE.Vector3(8.8,10.5,10.8),startPos=new THREE.Vector3(0,15.5,17.5),started=performance.now();camera.position.copy(startPos);
@@ -551,7 +604,7 @@
     document.getElementById('undo').onclick=()=>{if(animating||aiThinking)return;let m=chess.undo();if(m&&gameMode==='ai'&&chess.turn()!==humanColor)chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();sfxUndo();showToast('Đã hoàn tác')}};
     document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
-    addEventListener('pointerdown',()=>{if(musicOn&&!musicStarted)ensureMusic()},{once:true});
+    ['pointerdown','touchend','click'].forEach(ev=>addEventListener(ev,unlockAudioSystem,{once:true,passive:true}));
     document.addEventListener('visibilitychange',()=>{if(document.hidden)bgMusic.pause();else if(musicOn&&musicStarted)ensureMusic()});
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2))});
     renderPieces();refreshMarkers();updateStatus();
