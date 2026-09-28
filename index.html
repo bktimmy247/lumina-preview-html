@@ -39,10 +39,10 @@
   </script>
 </head>
 <body>
-  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD04-SFX</span></div>
+  <canvas id="game"></canvas><div class="edge-vignette"></div><div class="luxury-title"><b>ROYAL CHESS</b><span>STAUNTON HD · AI EDITION · BUILD HD05-MUSIC</span></div>
   <header class="topbar glass">
     <div class="brand"><span class="brand-mark">♛</span><div><strong>CỜ VUA 3D</strong><small>THREE.JS · WEBGL</small></div></div>
-    <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="sound" class="icon-btn" aria-label="Âm thanh">♪</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
+    <div class="actions"><button id="modeBtn" class="icon-btn" aria-label="Chế độ chơi">AI</button><button id="music" class="icon-btn" aria-label="Nhạc nền" title="Nhạc nền">♫</button><button id="sound" class="icon-btn" aria-label="Hiệu ứng âm thanh" title="SFX">🔊</button><button id="flip" class="icon-btn" aria-label="Đổi góc nhìn">↻</button></div>
   </header>
   <div class="badge glass">Kéo xoay · Chụm zoom · Chạm để đi</div>
   <section class="status glass">
@@ -412,6 +412,22 @@
       if(wantFlip!==flipped){flipped=wantFlip;const p=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);camera.position.copy(p);camera.lookAt(controls.target)}
       setTimeout(maybeAIMove,220);
     }
+    const MUSIC_URL='https://cdn1.suno.ai/7f1b9f01-13ef-42cf-b614-1603487535cd.mp3';
+    const MUSIC_VOLUME=.24;
+    const bgMusic=new Audio(MUSIC_URL);
+    bgMusic.loop=true;bgMusic.preload='auto';bgMusic.volume=MUSIC_VOLUME;bgMusic.playsInline=true;
+    let musicOn=true,musicStarted=false,musicDuckTimer=null;
+    async function ensureMusic(){
+      if(!musicOn)return;
+      try{await bgMusic.play();musicStarted=true}catch(err){console.debug('Music waits for user gesture',err)}
+    }
+    function duckMusic(ms=260,level=.15){
+      if(!musicOn||bgMusic.paused)return;
+      clearTimeout(musicDuckTimer);bgMusic.volume=level;
+      musicDuckTimer=setTimeout(()=>{if(musicOn)bgMusic.volume=MUSIC_VOLUME},ms);
+    }
+    bgMusic.addEventListener('error',()=>console.warn('Background music failed to load',MUSIC_URL));
+
     let audioCtx=null;
     const sfxRand=(a,b)=>a+Math.random()*(b-a);
     function ensureAudio(){
@@ -449,14 +465,16 @@
       tone(690*sfxRand(.98,1.02),.038,'sine',.018*sfxRand(.95,1.05));
       noiseBurst(.025,.008,1750);
     }
-    function sfxMove(){woodHit(178,.060)}
-    function sfxCapture(){woodHit(150,.072);woodHit(104,.055,.052)}
+    function sfxMove(){duckMusic(220,.17);woodHit(178,.060)}
+    function sfxCapture(){duckMusic(330,.13);woodHit(150,.072);woodHit(104,.055,.052)}
     function sfxCheck(){
+      duckMusic(520,.11);
       woodHit(165,.045);
       tone(784,.18,'sine',.029,.055,sfxRand(-5,5));
       tone(1175,.24,'sine',.020,.115,sfxRand(-4,4));
     }
     function sfxCheckmate(){
+      duckMusic(900,.09);
       woodHit(142,.064);
       tone(523.25,.22,'sine',.026,.07);
       tone(659.25,.26,'sine',.024,.17);
@@ -514,10 +532,17 @@
       localStorage.setItem('royalChessAILevel',aiLevel);
       localStorage.setItem('royalChessHumanColor',humanColor);
       modeOverlay.classList.remove('show');modeBtn.textContent=gameMode==='ai'?'AI':'2P';
+      ensureMusic();
       resetForMode();showToast(gameMode==='ai'?'Đấu máy · '+(aiLevel==='easy'?'Dễ':aiLevel==='hard'?'Khó':'Vừa'):'Chế độ hai người');
     };
     modeBtn.onclick=()=>{modeOverlay.classList.add('show')};
-    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;if(soundOn)ensureAudio();document.getElementById('sound').textContent=soundOn?'♪':'×';showToast(soundOn?'Đã bật SFX':'Đã tắt SFX')};
+    document.getElementById('music').onclick=()=>{
+      musicOn=!musicOn;
+      const btn=document.getElementById('music');
+      if(musicOn){bgMusic.volume=MUSIC_VOLUME;ensureMusic();btn.textContent='♫';showToast('Đã bật nhạc nền')}
+      else{bgMusic.pause();btn.textContent='×';showToast('Đã tắt nhạc nền')}
+    };
+    document.getElementById('sound').onclick=()=>{soundOn=!soundOn;if(soundOn)ensureAudio();document.getElementById('sound').textContent=soundOn?'🔊':'×';showToast(soundOn?'Đã bật SFX':'Đã tắt SFX')};
     document.getElementById('reset').onclick=()=>{resetForMode();
     {
       const finalPos=new THREE.Vector3(8.8,10.5,10.8),startPos=new THREE.Vector3(0,15.5,17.5),started=performance.now();camera.position.copy(startPos);
@@ -526,6 +551,8 @@
     document.getElementById('undo').onclick=()=>{if(animating||aiThinking)return;let m=chess.undo();if(m&&gameMode==='ai'&&chess.turn()!==humanColor)chess.undo();if(m){selected=null;legal=[];lastMove=null;renderPieces();refreshMarkers();updateStatus();sfxUndo();showToast('Đã hoàn tác')}};
     document.getElementById('flip').onclick=()=>{flipped=!flipped;const target=flipped?new THREE.Vector3(-8.8,10.5,-10.8):new THREE.Vector3(8.8,10.5,10.8);const start=camera.position.clone();let t=0;function step(){t=Math.min(1,t+.065);const s=t*t*(3-2*t);camera.position.lerpVectors(start,target,s);camera.lookAt(controls.target);if(t<1)requestAnimationFrame(step)}step()};
     function showToast(msg){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1200)}
+    addEventListener('pointerdown',()=>{if(musicOn&&!musicStarted)ensureMusic()},{once:true});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)bgMusic.pause();else if(musicOn&&musicStarted)ensureMusic()});
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2))});
     renderPieces();refreshMarkers();updateStatus();
     loadHDSet();
